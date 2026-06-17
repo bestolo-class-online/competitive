@@ -23,20 +23,29 @@
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
 
-  <!-- 全域 JavaScript 錯誤捕獲診斷器：防止任何白底畫面 -->
+  <!-- 💡 智慧型 JavaScript 錯誤捕獲診斷器：只捕捉並回報與本專案直接相關的致命錯誤，避免外部腳本與擴充功能干擾 -->
   <script>
     window.addEventListener('error', function(e) {
+      // 忽略來自外部 CDN、瀏覽器擴充功能 (chrome-extension) 或不相關來源的錯誤
+      if (e.filename && 
+          !e.filename.includes('index.html') && 
+          !e.filename.includes('bestolo-class-online') && 
+          e.filename !== '') {
+        console.warn("已忽略無關的外部腳本錯誤:", e.message, "來源:", e.filename);
+        return; 
+      }
+
       var root = document.getElementById('root');
       if (root) {
         root.innerHTML = `
           <div style="padding: 24px; background: #fff1f2; color: #9f1239; font-family: system-ui, sans-serif; border-radius: 12px; margin: 40px auto; max-width: 600px; border: 1px solid #fecdd3; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: left;">
             <h3 style="margin-top: 0; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-              <i class="fa-solid fa-triangle-exclamation" style="color: #e11d48;"></i> 網頁腳本載入或執行失敗
+              <i class="fa-solid fa-triangle-exclamation" style="color: #e11d48;"></i> 系統初始化失敗
             </h3>
             <p style="font-size: 14px; margin: 12px 0; font-weight: 500;">錯誤原因: ${e.message}</p>
-            <p style="font-size: 12px; color: #be123c; background: #ffe4e6; padding: 8px; border-radius: 6px; font-family: monospace;">檔案來源: ${e.filename} (第 ${e.lineno} 行)</p>
-            <p style="font-size: 13px; color: #4c0519; margin-top: 10px;">
-              ※ 請特別注意：請確認您複製到 GitHub 上的內容是「純程式碼」，而非帶有 GitHub 網站外殼的 HTML。
+            <p style="font-size: 12px; color: #be123c; background: #ffe4e6; padding: 8px; border-radius: 6px; font-family: monospace;">檔案來源: ${e.filename || '行內腳本'} (第 ${e.lineno || '未知'} 行)</p>
+            <p style="font-size: 13px; color: #4c0519; margin-top: 10px; line-height: 1.6;">
+              ※ <strong>請特別注意</strong>：若錯誤來源指向非本網域之檔案，通常為瀏覽器外掛或防毒軟體相衝突，請嘗試使用<strong>無痕視窗</strong>重新開啟此頁面。
             </p>
           </div>
         `;
@@ -55,7 +64,8 @@
     </div>
   </div>
 
-  <script type="text/babel">
+  <!-- 💡 加上 data-presets 屬性，強制 Babel 使用安全穩定的相容模式編譯 React JSX 代碼 -->
+  <script type="text/babel" data-presets="env,react">
     const { useState, useEffect } = React;
 
     // ==========================================
