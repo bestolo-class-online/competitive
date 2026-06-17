@@ -90,7 +90,7 @@
       };
 
       var INITIAL_PROJECTS = [
-        { id: 'mock-1', title: 'AI校園導覽機器人', category: '軟體開發組', student: '王小明', school: '資工三甲', date: '2026-06-15', uploadTime: '2026/06/15 下午 02:30:15', status: 'APPROVED', summary: '整合大型語言模型與語音辨識技術，開發校園智慧導覽軟體系統。', fileName: 'architecture_doc.pdf', fileSize: 1048576, fileType: 'application/pdf', thumbnail: '' }
+        { id: 'mock-1', title: 'AI校園導覽機器人', category: '軟體開發組', student: '王小明', studentId: 'student', school: '資工三甲', date: '2026-06-15', uploadTime: '2026/06/15 下午 02:30:15', status: 'APPROVED', summary: '整合大型語言模型與語音辨識技術，開發校園智慧導覽軟體系統。', fileName: 'architecture_doc.pdf', fileSize: 1048576, fileType: 'application/pdf', thumbnail: '' }
       ];
 
       function App() {
@@ -150,7 +150,7 @@
           if (!firebaseReady || !auth) {
             setStatusBanner({ 
               type: 'warning', 
-              text: '💡 目前處於「本地安全快取模式」。系統全功能皆已啟用，設定變更將安全保存在本地。' 
+              text: '💡 目前處於「本地安全快取模式」。系統全功能皆已啟用，資料將安全保存在 LocalStorage 中。' 
             });
             // 載入 LocalStorage 預設使用者資料
             var localUsers = localStorage.getItem('hses_users');
@@ -165,20 +165,27 @@
             if (localCats) setCategories(JSON.parse(localCats));
             var localSettings = localStorage.getItem('hses_settings');
             if (localSettings) setSystemSettings(JSON.parse(localSettings));
+            
+            // 載入本地作品
             var localProjects = localStorage.getItem('hses_projects');
-            if (localProjects) setProjects(JSON.parse(localProjects));
+            if (localProjects) {
+              setProjects(JSON.parse(localProjects));
+            } else {
+              localStorage.setItem('hses_projects', JSON.stringify(INITIAL_PROJECTS));
+              setProjects(INITIAL_PROJECTS);
+            }
             return;
           }
 
           var runAuth = async function() {
             try {
               await auth.signInAnonymously();
-              setStatusBanner({ type: 'success', text: '⚡ 已安全連接 HSES 雲端 Firestore 資料庫，所有資料即時進行雙向同步！' });
+              setStatusBanner({ type: 'success', text: '⚡ 已安全連接 HSES 雲端 Firestore 資料庫，所有數據即時進行雙向同步！' });
             } catch (error) {
               console.error('Firebase 登入失敗:', error);
               setStatusBanner({ 
                 type: 'warning', 
-                text: '⚠️ 雲端連線失敗，自動降級為本地安全快取模式（請在 Firebase 啟用匿名登入）。' 
+                text: '⚠️ 雲端連線失敗，自動降級為本地安全快取模式（請確認 Firebase 匿名驗證已開啟）。' 
               });
             }
           };
@@ -201,6 +208,8 @@
               var data = snapshot.docs.map(function(doc) { return doc.data(); });
               setUsers(data);
             }
+          }, function(err) {
+            console.error("無法同步帳號列表:", err);
           });
 
           // (2) 訂閱競賽與系統設定
@@ -223,9 +232,11 @@
                 submissionEnd: '2026-06-30'
               });
             }
+          }, function(err) {
+            console.error("無法同步系統設定:", err);
           });
 
-          // (3) 訂閱投稿作品
+          // (3) 訂閱投稿作品 (最關鍵修復點：確保學生的上傳能在雙端即時監聽與呈現)
           var projectsPath = 'artifacts/' + appId + '/public/data/projects';
           var unsubProjects = db.collection(projectsPath).onSnapshot(function(snapshot) {
             if (!snapshot.empty) {
@@ -236,6 +247,12 @@
             } else {
               setProjects([]);
             }
+          }, function(err) {
+            console.error("無法同步作品列表:", err);
+            setStatusBanner({ 
+              type: 'warning', 
+              text: '🔒 Firebase 阻擋了資料讀取。請至 Firestore 的 Rules 將規則修改為允許讀寫。' 
+            });
           });
 
           return function() {
@@ -245,21 +262,17 @@
           };
         }, [firebaseReady]);
 
-        // 資料寫入輔助函數 (相容雲端與本地端)
+        // 資料寫入與同步輔助函數
         var updateUsersDb = async function(updatedList) {
           setUsers(updatedList);
-          if (firebaseReady && db) {
-            // 已由 onSnapshot 監聽，此處僅供本地端非同步容錯
-          } else {
+          if (!firebaseReady || !db) {
             localStorage.setItem('hses_users', JSON.stringify(updatedList));
           }
         };
 
         var updateProjectsDb = async function(updatedList) {
           setProjects(updatedList);
-          if (firebaseReady && db) {
-            // 由 onSnapshot 自動監聽同步
-          } else {
+          if (!firebaseReady || !db) {
             localStorage.setItem('hses_projects', JSON.stringify(updatedList));
           }
         };
@@ -553,10 +566,10 @@
           var formData = formState[0];
           var setFormData = formState[1];
 
-          // 檔案上傳相關狀態
-          var fileInfoState = useState(null); // { name, size, type, uploadTime, thumbnail }
-          var fileInfo = fileInfoState[0];
-          var setFileInfo = fileInfoState[1];
+          // 💡 修正：使用單純的 file 物件狀態，不再預先生成 Base64 縮圖與呈現
+          var fileState = useState(null); 
+          var file = fileState[0];
+          var setFile = fileState[1];
 
           var submitState = useState(false);
           var submitting = submitState[0];
@@ -566,57 +579,20 @@
           var isOpen = checkSubmissionOpen();
 
           var handleFileChange = function(e) {
-            var file = e.target.files[0];
-            if (!file) return;
+            var selectedFile = e.target.files[0];
+            if (!selectedFile) return;
 
             // 限制 20MB
             var maxLimit = 20 * 1024 * 1024;
-            if (file.size > maxLimit) {
+            if (selectedFile.size > maxLimit) {
               triggerToast("檔案超過 20MB 上限限制！請選擇較小的檔案。", "error");
               e.target.value = null; // 清空選擇
               return;
             }
 
-            var uploadTimeStr = new Date().toLocaleString('zh-TW', { hour12: true });
-
-            // 若為圖片格式，在前端使用 Canvas 生成縮圖（解決 Firestore 1MB 文檔容量上限）
-            if (file.type.startsWith('image/')) {
-              var reader = new FileReader();
-              reader.onload = function(event) {
-                var img = new Image();
-                img.onload = function() {
-                  var canvas = document.createElement('canvas');
-                  var max_width = 300; // 壓縮在 300px 寬度內，十分輕量
-                  var scale = max_width / img.width;
-                  canvas.width = max_width;
-                  canvas.height = img.height * scale;
-                  var ctx = canvas.getContext('2d');
-                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                  
-                  var compressedBase64 = canvas.toDataURL('image/jpeg', 0.7); // 輕量 JPG 縮圖
-                  setFileInfo({
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                    uploadTime: uploadTimeStr,
-                    thumbnail: compressedBase64
-                  });
-                  triggerToast("圖檔讀取並成功生成評分縮圖！", "success");
-                };
-                img.src = event.target.result;
-              };
-              reader.readAsDataURL(file);
-            } else {
-              // 非圖檔，僅紀錄中繼資訊
-              setFileInfo({
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                uploadTime: uploadTimeStr,
-                thumbnail: ''
-              });
-              triggerToast("檔案讀取完成，中繼資料已就緒！", "success");
-            }
+            // 僅暫存原始檔案，此處絕不提前載入縮圖
+            setFile(selectedFile);
+            triggerToast("檔案已成功載入！按下送出後系統會自動為圖檔生成審核縮圖。", "success");
           };
 
           var handleSave = async function(isDraft) {
@@ -630,50 +606,82 @@
               return;
             }
 
-            if (!fileInfo) {
+            if (!file) {
               triggerToast("請上傳您的作品檔案 (限20MB內)！", "error");
               return;
             }
             
             setSubmitting(true);
             var targetStatus = isDraft ? 'DRAFT' : 'SUBMITTED';
+            var uploadTimeStr = new Date().toLocaleString('zh-TW', { hour12: true });
 
-            var newProject = {
-              title: formData.title,
-              category: formData.category,
-              school: currentUser.school || '資工三甲',
-              student: currentUser.name,
-              studentId: currentUser.account,
-              advisor: formData.advisor || '無',
-              summary: formData.summary || '未提供作品摘要。',
-              date: new Date().toISOString().split('T')[0],
-              uploadTime: fileInfo.uploadTime,
-              fileName: fileInfo.name,
-              fileSize: fileInfo.size,
-              fileType: fileInfo.type,
-              thumbnail: fileInfo.thumbnail || '', // 圖檔儲存縮圖數據
-              status: targetStatus
-            };
+            // 核心儲存邏輯
+            var executeSave = async function(thumbnailBase64) {
+              var newProject = {
+                title: formData.title,
+                category: formData.category,
+                school: currentUser.school || '資工三甲',
+                student: currentUser.name,
+                studentId: currentUser.account, // 對應當前登入學生的帳號
+                advisor: formData.advisor || '無',
+                summary: formData.summary || '未提供作品摘要。',
+                date: new Date().toISOString().split('T')[0],
+                uploadTime: uploadTimeStr,
+                fileName: file.name,
+                fileSize: file.size,
+                fileType: file.type,
+                thumbnail: thumbnailBase64 || '', // 儲存經壓縮後的 Base64 數據
+                status: targetStatus
+              };
 
-            if (firebaseReady && db) {
-              try {
-                var collectionPath = 'artifacts/' + appId + '/public/data/projects';
-                await db.collection(collectionPath).add(newProject);
-                triggerToast(isDraft ? '草稿儲存成功！' : '參賽作品已成功上傳送出！', "success");
+              if (firebaseReady && db) {
+                try {
+                  var collectionPath = 'artifacts/' + appId + '/public/data/projects';
+                  await db.collection(collectionPath).add(newProject);
+                  triggerToast(isDraft ? '草稿儲存成功！' : '參賽作品已成功上傳並發送至雲端審核！', "success");
+                  setCurrentView('DASHBOARD');
+                } catch (err) {
+                  console.error(err);
+                  triggerToast('雲端儲存失敗，請檢查 Firestore 安全規則是否允許寫入。', "error");
+                } finally {
+                  setSubmitting(false);
+                }
+              } else {
+                // 本地端儲存與備援
+                var simulatedId = 'local-' + Date.now();
+                var updatedList = [Object.assign({ id: simulatedId }, newProject)].concat(projects);
+                updateProjectsDb(updatedList);
+                triggerToast("[本地儲存成功] " + (isDraft ? '草稿已暫存！' : '參賽作品已發布！'), "success");
                 setCurrentView('DASHBOARD');
-              } catch (err) {
-                console.error(err);
-                triggerToast('雲端儲存失敗，請檢查 Firestore 的 Rules 規則。', "error");
-              } finally {
                 setSubmitting(false);
               }
+            };
+
+            // 💡 修正：在按下「送出審查」或「儲存草稿」那一瞬間，才在背景處理圖片並生成評分縮圖
+            if (file.type.startsWith('image/')) {
+              triggerToast("系統正在在背景安全生成評定縮圖中，請稍候...", "info");
+              var reader = new FileReader();
+              reader.onload = function(event) {
+                var img = new Image();
+                img.onload = function() {
+                  var canvas = document.createElement('canvas');
+                  var max_width = 320; // 壓縮縮圖寬度以保證相容 Firestore 體積
+                  var scale = max_width / img.width;
+                  canvas.width = max_width;
+                  canvas.height = img.height * scale;
+                  var ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                  
+                  // 將高畫質輕量 JPG 生成 Base64
+                  var compressedBase64 = canvas.toDataURL('image/jpeg', 0.6); 
+                  executeSave(compressedBase64);
+                };
+                img.src = event.target.result;
+              };
+              reader.readAsDataURL(file);
             } else {
-              var simulatedId = 'local-' + Date.now();
-              var updatedList = [Object.assign({ id: simulatedId }, newProject)].concat(projects);
-              updateProjectsDb(updatedList);
-              triggerToast("[本地儲存成功] " + (isDraft ? '草稿已暫存！' : '作品已提交！'), "success");
-              setCurrentView('DASHBOARD');
-              setSubmitting(false);
+              // 非圖檔則直接儲存
+              executeSave('');
             }
           };
 
@@ -720,9 +728,9 @@
               ),
 
               // 實際檔案上傳機制 (限定 20MB)
-              h('div', { className: "border border-slate-200 rounded-2xl p-5 bg-slate-50/50" },
+              h('div', { className: "border border-slate-200 rounded-2xl p-5 bg-slate-50/50 hover:bg-slate-50 transition" },
                 h('h4', { className: "text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5" },
-                  h('i', { className: "fa-solid fa-paperclip text-blue-500" }), "上傳參賽大檔 (上限 20MB)"
+                  h('i', { className: "fa-solid fa-paperclip text-blue-500" }), "上傳參賽檔案 (上限 20MB)"
                 ),
                 h('div', { className: "relative border-2 border-dashed border-slate-200 rounded-xl p-6 text-center bg-white hover:border-blue-400 transition cursor-pointer" },
                   h('input', {
@@ -736,20 +744,29 @@
                   h('p', { className: "text-[11px] text-slate-400 mt-1" }, "支援 JPG, PNG, PDF, ZIP, PPT 等各式檔案，限制最高 20MB")
                 ),
                 
-                // 上傳檔案中繼與縮圖預覽區
-                fileInfo && h('div', { className: "mt-4 p-4 bg-white border border-slate-150 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm" },
+                // 💡 修正：選取檔案後僅顯示標準檔案卡片與對應類型圖示，不再於此處渲染縮圖！
+                file && h('div', { className: "mt-4 p-4 bg-white border border-slate-150 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm" },
                   h('div', { className: "flex items-center gap-3.5" },
-                    fileInfo.thumbnail ? h('img', { src: fileInfo.thumbnail, className: "h-14 w-14 object-cover rounded-lg border border-slate-200 shadow-sm" })
-                    : h('div', { className: "h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500 text-xl" },
-                        h('i', { className: "fa-solid " + (fileInfo.type.includes('pdf') ? 'fa-file-pdf text-red-500' : fileInfo.type.includes('zip') ? 'fa-file-zipper text-amber-500' : 'fa-file-lines') })
-                      ),
+                    h('div', { className: "h-12 w-12 rounded-lg flex items-center justify-center text-xl " + (
+                        file.type.startsWith('image/') ? 'bg-emerald-50 text-emerald-500' :
+                        file.type.includes('pdf') ? 'bg-rose-50 text-red-500' :
+                        file.type.includes('zip') ? 'bg-amber-50 text-amber-500' :
+                        'bg-blue-50 text-blue-500'
+                      )},
+                      h('i', { className: "fa-solid " + (
+                          file.type.startsWith('image/') ? 'fa-file-image' :
+                          file.type.includes('pdf') ? 'fa-file-pdf' :
+                          file.type.includes('zip') ? 'fa-file-zipper' :
+                          'fa-file-lines'
+                        )})
+                    ),
                     h('div', { className: "text-left" },
-                      h('p', { className: "text-xs sm:text-sm font-bold text-slate-800" }, fileInfo.name),
-                      h('p', { className: "text-[11px] text-slate-400 mt-0.5" }, "檔案大小：" + formatBytes(fileInfo.size) + " • 紀錄時間：" + fileInfo.uploadTime)
+                      h('p', { className: "text-xs sm:text-sm font-bold text-slate-800" }, file.name),
+                      h('p', { className: "text-[11px] text-slate-400 mt-0.5" }, "檔案大小：" + formatBytes(file.size) + " • 類型：" + file.type)
                     )
                   ),
                   h('button', {
-                    onClick: function() { setFileInfo(null); },
+                    onClick: function() { setFile(null); },
                     className: "text-slate-400 hover:text-rose-500 transition px-2 py-1"
                   }, h('i', { className: "fa-regular fa-circle-xmark text-lg" }))
                 )
@@ -767,7 +784,7 @@
                   disabled: submitting || !isOpen,
                   onClick: function() { handleSave(false); },
                   className: "px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 transition active:scale-[0.98] disabled:opacity-50 text-sm"
-                }, submitting ? '上傳同步中...' : '確認送出審查')
+                }, submitting ? '縮圖壓縮並上傳中...' : '確認送出審查')
               )
             )
           );
@@ -795,7 +812,7 @@
                 var collectionPath = 'artifacts/' + appId + '/public/data/projects';
                 await db.collection(collectionPath).doc(selectedProject.id).update({
                   status: newStatus,
-                  teacherFeedback: feedback || '審查通過，無具體修改意見。'
+                  teacherFeedback: feedback || '審查完成，無具體修改意見。'
                 });
                 triggerToast("作品審定決議已更新！狀態：" + MOCK_STATUSES[newStatus].label, "success");
                 setCurrentView('DASHBOARD');
@@ -831,7 +848,7 @@
                     MOCK_STATUSES[selectedProject.status]?.label || selectedProject.status
                   )
                 ),
-                h('div', { className: "grid grid-cols-2 gap-4 text-xs sm:text-sm text-slate-600 mb-6 bg-slate-50 p-4 rounded-xl" },
+                h('div', { className: "grid grid-cols-2 gap-4 text-xs sm:text-sm text-slate-600 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100" },
                   h('p', null, h('span', { className: "text-slate-400 mr-2" }, "參賽學生:"), selectedProject.student),
                   h('p', null, h('span', { className: "text-slate-400 mr-2" }, "所屬單位:"), selectedProject.school),
                   h('p', null, h('span', { className: "text-slate-400 mr-2" }, "指導老師:"), selectedProject.advisor || '無'),
@@ -844,7 +861,7 @@
                   )
                 ),
                 
-                // 💡 評審端縮圖顯示區 (核心需求：若為圖檔，評審可看到縮圖方便評分)
+                // 評審端縮圖與上傳紀錄預覽區 (評審可以看到縮圖方便評分)
                 h('div', { className: "p-4 bg-slate-50 border border-slate-150 rounded-xl" },
                   h('h4', { className: "font-bold text-slate-800 mb-3 flex items-center gap-1.5" },
                     h('i', { className: "fa-solid fa-file-shield text-blue-500" }), "作品附件與縮圖預覽"
@@ -855,12 +872,16 @@
                     ),
                     h('img', { 
                       src: selectedProject.thumbnail, 
-                      className: "max-w-xs h-auto object-contain rounded-xl border border-slate-200 shadow-md hover:scale-105 transition duration-300" 
-                    })
-                  ) : h('div', { className: "p-3 bg-white border border-slate-100 rounded-lg flex items-center justify-between" },
+                      className: "max-w-xs h-auto object-contain rounded-xl border border-slate-200 shadow-md hover:scale-105 transition duration-300 bg-white" 
+                    }),
+                    h('p', { className: "text-[11px] text-slate-400 font-mono" }, "上傳歷史紀錄時間：" + (selectedProject.uploadTime || '未知'))
+                  ) : h('div', { className: "p-3 bg-white border border-slate-100 rounded-lg flex items-center justify-between shadow-sm" },
                     h('div', { className: "flex items-center gap-3 text-sm text-slate-700" },
-                      h('i', { className: "fa-solid fa-file-arrow-down text-blue-500 text-lg" }),
-                      h('span', { className: "font-semibold" }, selectedProject.fileName || "作品附檔")
+                      h('i', { className: "fa-solid fa-file-arrow-down text-blue-500 text-lg animate-bounce" }),
+                      h('div', { className: "text-left" },
+                        h('span', { className: "font-bold text-slate-800 block" }, selectedProject.fileName || "作品附檔"),
+                        h('span', { className: "text-[10px] text-slate-400 block font-mono" }, "上傳紀錄時間：" + (selectedProject.uploadTime || '未知'))
+                      )
                     ),
                     h('span', { className: "text-xs text-slate-400" }, "檔案大小：" + formatBytes(selectedProject.fileSize))
                   )
@@ -914,12 +935,11 @@
         // 系統管理員：帳號密碼維護面板 (核心需求)
         // ==========================================
         var AdminUsersView = function() {
-          // 新增帳號臨時狀態
           var newUserState = useState({ account: '', password: '', name: '', role: 'STUDENT', school: '' });
           var newUser = newUserState[0];
           var setNewUser = newUserState[1];
           
-          var editingState = useState(false); // 編輯模式旗標
+          var editingState = useState(false);
 
           var handleSaveUser = async function() {
             if (!newUser.account.trim() || !newUser.password.trim() || !newUser.name.trim()) {
@@ -933,7 +953,6 @@
               return;
             }
 
-            // 更新到雲端/本地
             var updatedList = users.filter(function(u) { return u.account !== newUser.account; }).concat(newUser);
             await updateUsersDb(updatedList);
             
@@ -964,14 +983,13 @@
           };
 
           return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
-            // 左側列表
             h('div', { className: "lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100" },
               h('h3', { className: "text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5" },
                 h('i', { className: "fa-solid fa-users text-blue-500" }), "現有使用者帳號清冊"
               ),
               h('div', { className: "overflow-x-auto" },
                 h('table', { className: "w-full text-sm text-left text-slate-600" },
-                  h('thead', { className: "bg-slate-50 text-slate-500 font-semibold" },
+                  h('thead', { className: "bg-slate-50 text-slate-500 font-semibold border-b border-slate-100" },
                     h('tr', null,
                       h('th', { className: "py-3 px-4" }, "姓名"),
                       h('th', { className: "py-3 px-4" }, "帳號"),
@@ -1011,8 +1029,6 @@
                 )
               )
             ),
-
-            // 右側新增與修改卡片
             h('div', { className: "lg:col-span-1" },
               h('div', { className: "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6" },
                 h('h3', { className: "text-base font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-1.5" },
@@ -1221,7 +1237,6 @@
         // 通用：列表主總覽 (Dashboard)
         // ==========================================
         var DashboardList = function() {
-          // 學生僅顯示本人作品，教師/管理員顯示全部
           var displayProjects = currentUser.role === 'STUDENT'
             ? projects.filter(function(p) { return p.studentId === currentUser.account; })
             : projects;
@@ -1245,7 +1260,6 @@
           };
 
           return h('div', { className: "space-y-6 text-left animate-fade-in" },
-            // 數據分析卡 (管理員或教師顯示)
             currentUser.role !== 'STUDENT' && h('div', { className: "grid grid-cols-2 lg:grid-cols-4 gap-4" },
               h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
                 h('div', { className: "p-2.5 bg-blue-50 text-blue-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-file-invoice w-5 text-center" })),
@@ -1276,8 +1290,6 @@
                 )
               )
             ),
-
-            // 列表主體
             h('div', { className: "bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" },
               h('div', { className: "p-4.5 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4" },
                 h('div', { className: "w-full sm:flex-1 relative" },
@@ -1289,7 +1301,6 @@
                   })
                 )
               ),
-
               h('div', { className: "overflow-x-auto" },
                 h('table', { className: "w-full text-left text-xs sm:text-sm whitespace-nowrap" },
                   h('thead', { className: "bg-slate-50 text-slate-500 font-bold border-b border-slate-100" },
@@ -1311,7 +1322,7 @@
                       return h('tr', { key: project.id, className: "hover:bg-slate-50/30 transition" },
                         h('td', { className: "py-4 px-6 font-semibold text-slate-800" },
                           h('div', { className: "flex items-center gap-3.5" },
-                            project.thumbnail ? h('img', { src: project.thumbnail, className: "h-9 w-9 object-cover rounded-lg border shadow-sm" })
+                            project.thumbnail ? h('img', { src: project.thumbnail, className: "h-9 w-9 object-cover rounded-lg border shadow-sm bg-white" })
                             : h('div', { className: "h-9 w-9 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500 text-sm" },
                                 h('i', { className: "fa-solid " + (project.fileType && project.fileType.includes('pdf') ? 'fa-file-pdf text-red-500' : 'fa-file-lines') })
                               ),
@@ -1325,10 +1336,10 @@
                         h('td', { className: "py-4 px-6 text-slate-500" },
                           currentUser.role === 'STUDENT' ? h('div', null,
                             h('p', { className: "font-semibold text-slate-700" }, project.date),
-                            h('p', { className: "text-[10px] text-slate-400" }, "系統存檔：" + (project.uploadTime || '未知'))
+                            h('p', { className: "text-[10px] text-slate-400 font-mono" }, "上傳時間：" + (project.uploadTime || '未知'))
                           ) : h('div', null,
                             h('p', { className: "font-bold text-slate-700" }, project.student),
-                            h('p', { className: "text-[10px] text-slate-400" }, project.school + " • " + (project.uploadTime || '未知'))
+                            h('p', { className: "text-[10px] text-slate-400 font-mono" }, project.school + " • " + (project.uploadTime || '未知'))
                           )
                         ),
                         h('td', { className: "py-4 px-6 text-center" },
@@ -1348,11 +1359,11 @@
                                 var feedbackMsg = project.teacherFeedback ? "\n評審建議意見：\n" + project.teacherFeedback : "\n評審尚未填寫修改意見。";
                                 alert("【作品項目名稱】\n" + project.title + "\n\n組別：" + project.category + "\n狀態：" + MOCK_STATUSES[project.status]?.label + "\n指導老師：" + project.advisor + "\n" + feedbackMsg); 
                               },
-                              className: "text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded"
+                              className: "text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 transition"
                             }, "詳情"),
                             currentUser.role === 'STUDENT' && h('button', {
                               onClick: function() { handleDeleteProject(project.id); },
-                              className: "text-rose-500 hover:text-rose-700 font-bold px-2 py-1 rounded"
+                              className: "text-rose-500 hover:text-rose-700 font-bold px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 transition"
                             }, "撤回")
                           )
                         )
