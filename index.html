@@ -31,6 +31,36 @@
     </div>
   </div>
 
+  <!-- 💡 [HTML 註解標註區] 系統內置展示帳號資訊以 HTML 註解方式保存，不呈現在網頁畫面上 -->
+  <!-- 
+  =======================================================
+  💡 系統內置展示帳號資訊（可直接用於測試登入）：
+  =======================================================
+  <div class="w-full max-w-md mt-6 bg-slate-100 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 shadow-sm">
+    <p class="font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+      <i class="fa-solid fa-circle-info text-blue-500"></i> 系統內置展示帳號資訊（可直接測試登入）：
+    </p>
+    <div class="grid grid-cols-3 gap-2">
+      <div class="bg-white p-2 rounded border border-slate-200">
+        <p class="font-bold text-slate-800">🛡️ 管理者</p>
+        <p>帳號: admin</p>
+        <p>密碼: admin123</p>
+      </div>
+      <div class="bg-white p-2 rounded border border-slate-200">
+        <p class="font-bold text-slate-800">👨‍🏫 評審委員</p>
+        <p>帳號: teacher</p>
+        <p>密碼: teacher123</p>
+      </div>
+      <div class="bg-white p-2 rounded border border-slate-200">
+        <p class="font-bold text-slate-800">👨‍🎓 參賽學生</p>
+        <p>帳號: student</p>
+        <p>密碼: student123</p>
+      </div>
+    </div>
+  </div>
+  =======================================================
+  -->
+
   <!-- 使用 100% 原生相容 JavaScript，無 Babel 即時轉譯，徹底解決跨網域沙盒 import/appendChild 錯誤 -->
   <script>
     (function() {
@@ -93,8 +123,1115 @@
         { id: 'mock-1', title: 'AI校園導覽機器人', category: '軟體開發組', student: '王小明', studentId: 'student', school: '資工三甲', date: '2026-06-15', uploadTime: '2026/06/15 下午 02:30:15', status: 'APPROVED', summary: '整合大型語言模型與語音辨識技術，開發校園智慧導覽軟體系統。', fileName: 'architecture_doc.pdf', fileSize: 1048576, fileType: 'application/pdf', thumbnail: '' }
       ];
 
+      // ==========================================
+      // 獨立元件 1: 登入介面 (移至外部，避免狀態丟失)
+      // ==========================================
+      function LoginView(props) {
+        var users = props.users;
+        var handleLogin = props.handleLogin;
+        var accState = useState('');
+        var pwState = useState('');
+        
+        // 💡 僅返回登入卡片，測試用的內置展示帳號面板已被移至外部 HTML 註解內，不予呈現
+        return h('div', { className: "min-h-screen flex flex-col justify-center items-center px-4 bg-gradient-to-tr from-slate-100 to-slate-200" },
+          h('div', { className: "w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-slate-100" },
+            h('div', { className: "text-center mb-8" },
+              h('div', { className: "mx-auto h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 text-2xl mb-3 shadow-inner" },
+                h('i', { className: "fa-solid fa-graduation-cap" })
+              ),
+              h('h2', { className: "text-2xl font-black text-slate-800 tracking-wide" }, "競賽作品投稿平台"),
+              h('p', { className: "text-xs text-slate-400 mt-1.5" }, "HSES Student Information Competition")
+            ),
+            h('div', { className: "space-y-4" },
+              h('div', null,
+                h('label', { className: "block text-xs font-bold text-slate-500 mb-1.5 uppercase" }, "使用者帳號"),
+                h('div', { className: "relative" },
+                  h('i', { className: "fa-solid fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" }),
+                  h('input', {
+                    type: "text",
+                    value: accState[0],
+                    onChange: function(e) { accState[1](e.target.value); },
+                    className: "w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm text-slate-700",
+                    placeholder: "請輸入帳號"
+                  })
+                )
+              ),
+              h('div', null,
+                h('label', { className: "block text-xs font-bold text-slate-500 mb-1.5 uppercase" }, "密碼"),
+                h('div', { className: "relative" },
+                  h('i', { className: "fa-solid fa-lock absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" }),
+                  h('input', {
+                    type: "password",
+                    value: pwState[0],
+                    onChange: function(e) { pwState[1](e.target.value); },
+                    className: "w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm text-slate-700",
+                    placeholder: "請輸入密碼",
+                    onKeyDown: function(e) { if (e.key === 'Enter') handleLogin(accState[0], pwState[0]); }
+                  })
+                )
+              ),
+              h('button', {
+                onClick: function() { handleLogin(accState[0], pwState[0]); },
+                className: "w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition shadow-lg shadow-blue-500/10 active:scale-[0.98] mt-2 text-sm"
+              }, "安全登入")
+            )
+          )
+        );
+      }
+
+      // ==========================================
+      // 獨立元件 2: 學生端投稿表單 (狀態永不丟失)
+      // ==========================================
+      function StudentSubmitForm(props) {
+        var categories = props.categories;
+        var systemSettings = props.systemSettings;
+        var currentUser = props.currentUser;
+        var firebaseReady = props.firebaseReady;
+        var db = props.db;
+        var appId = props.appId;
+        var projects = props.projects;
+        var updateProjectsDb = props.updateProjectsDb;
+        var setCurrentView = props.setCurrentView;
+        var triggerToast = props.triggerToast;
+        var formatBytes = props.formatBytes;
+        var checkSubmissionOpen = props.checkSubmissionOpen;
+
+        var formState = useState({ title: '', category: categories[0] || '', summary: '', advisor: '' });
+        var formData = formState[0];
+        var setFormData = formState[1];
+
+        // 僅保留原始的 file 物件狀態，安全存檔
+        var fileState = useState(null); 
+        var file = fileState[0];
+        var setFile = fileState[1];
+
+        var submitState = useState(false);
+        var submitting = submitState[0];
+        var setSubmitting = submitState[1];
+
+        var isOpen = checkSubmissionOpen();
+
+        var handleFileChange = function(e) {
+          var selectedFile = e.target.files[0];
+          if (!selectedFile) return;
+
+          // 限制 20MB
+          var maxLimit = 20 * 1024 * 1024;
+          if (selectedFile.size > maxLimit) {
+            triggerToast("檔案超過 20MB 上限限制！請選擇較小的檔案。", "error");
+            e.target.value = null;
+            return;
+          }
+
+          setFile(selectedFile);
+          triggerToast("檔案已成功載入！按下送出後系統會自動為圖檔生成審核縮圖。", "success");
+        };
+
+        var handleSave = async function(isDraft) {
+          if (!isOpen) {
+            triggerToast("目前非開放投稿時間，禁止新增投稿！", "error");
+            return;
+          }
+
+          if (!formData.title.trim()) {
+            triggerToast("請輸入作品名稱！", "error");
+            return;
+          }
+
+          if (!file) {
+            triggerToast("請上傳您的作品檔案 (限20MB內)！", "error");
+            return;
+          }
+          
+          setSubmitting(true);
+          var targetStatus = isDraft ? 'DRAFT' : 'SUBMITTED';
+          var uploadTimeStr = new Date().toLocaleString('zh-TW', { hour12: true });
+
+          // 儲存主程式
+          var executeSave = async function(thumbnailBase64) {
+            var newProject = {
+              title: formData.title,
+              category: formData.category,
+              school: currentUser.school || '資工三甲',
+              student: currentUser.name,
+              studentId: currentUser.account,
+              advisor: formData.advisor || '無',
+              summary: formData.summary || '未提供作品摘要。',
+              date: new Date().toISOString().split('T')[0],
+              uploadTime: uploadTimeStr,
+              fileName: file.name,
+              fileSize: file.size,
+              fileType: file.type,
+              thumbnail: thumbnailBase64 || '',
+              status: targetStatus
+            };
+
+            if (firebaseReady && db) {
+              try {
+                var collectionPath = 'artifacts/' + appId + '/public/data/projects';
+                await db.collection(collectionPath).add(newProject);
+                triggerToast(isDraft ? '草稿儲存成功！' : '參賽作品已成功上傳並發送至雲端審核！', "success");
+                setCurrentView('DASHBOARD');
+              } catch (err) {
+                console.error(err);
+                triggerToast('雲端儲存失敗，請檢查 Firestore 安全規則是否允許寫入。', "error");
+              } finally {
+                setSubmitting(false);
+              }
+            } else {
+              var simulatedId = 'local-' + Date.now();
+              var updatedList = [Object.assign({ id: simulatedId }, newProject)].concat(projects);
+              updateProjectsDb(updatedList);
+              triggerToast("[本地儲存成功] " + (isDraft ? '草稿已暫存！' : '參賽作品已發布！'), "success");
+              setCurrentView('DASHBOARD');
+              setSubmitting(false);
+            }
+          };
+
+          // 在送出的那一瞬間，才在背景處理壓縮與縮圖
+          if (file && file.type && file.type.indexOf('image/') === 0) {
+            triggerToast("系統正在在背景安全生成評定縮圖中，請稍候...", "info");
+            var reader = new FileReader();
+            reader.onload = function(event) {
+              var img = new Image();
+              img.onload = function() {
+                var canvas = document.createElement('canvas');
+                var max_width = 320; 
+                var scale = max_width / img.width;
+                canvas.width = max_width;
+                canvas.height = img.height * scale;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                var compressedBase64 = canvas.toDataURL('image/jpeg', 0.6); 
+                executeSave(compressedBase64);
+              };
+              img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+          } else {
+            executeSave('');
+          }
+        };
+
+        return h('div', { className: "max-w-3xl bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100 text-left" },
+          !isOpen && h('div', { className: "mb-6 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl text-sm font-bold flex items-center gap-2" },
+            h('i', { className: "fa-solid fa-triangle-exclamation text-lg" }),
+            "⚠️ 目前「非開放投稿期間」！開放時段為：" + systemSettings.submissionStart + " 至 " + systemSettings.submissionEnd
+          ),
+          h('div', { className: "space-y-6" },
+            h('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-6" },
+              h('div', null,
+                h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "作品名稱 ", h('span', { className: "text-red-500" }, "*")),
+                h('input', {
+                  type: "text",
+                  disabled: !isOpen,
+                  value: formData.title,
+                  onChange: function(e) { setFormData(Object.assign({}, formData, { title: e.target.value })); },
+                  className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm disabled:bg-slate-100",
+                  placeholder: "例如：智慧防護居家物聯網平台"
+                })
+              ),
+              h('div', null,
+                h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "競賽組別 ", h('span', { className: "text-red-500" }, "*")),
+                h('select', {
+                  disabled: !isOpen,
+                  value: formData.category,
+                  onChange: function(e) { setFormData(Object.assign({}, formData, { category: e.target.value })); },
+                  className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white transition cursor-pointer text-sm disabled:bg-slate-100"
+                },
+                  categories.map(function(c) { return h('option', { key: c, value: c }, c); })
+                )
+              ),
+              h('div', null,
+                h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "指導老師 (選填)"),
+                h('input', {
+                  type: "text",
+                  disabled: !isOpen,
+                  value: formData.advisor,
+                  onChange: function(e) { setFormData(Object.assign({}, formData, { advisor: e.target.value })); },
+                  className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm disabled:bg-slate-100",
+                  placeholder: "若無則留空"
+                })
+              ),
+              h('div', null,
+                h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "參賽班級"),
+                h('input', {
+                  type: "text",
+                  disabled: true,
+                  value: currentUser.school,
+                  className: "w-full p-3 border border-slate-200 rounded-xl bg-slate-100 text-sm outline-none text-slate-500"
+                })
+              )
+            ),
+            h('div', null,
+              h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "作品摘要概述"),
+              h('textarea', {
+                rows: "4",
+                disabled: !isOpen,
+                value: formData.summary,
+                onChange: function(e) { setFormData(Object.assign({}, formData, { summary: e.target.value })); },
+                className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition resize-none text-sm disabled:bg-slate-100",
+                placeholder: "請描述作品的設計理念、解決問題及核心亮點功能..."
+              })
+            ),
+
+            // 檔案上傳區
+            h('div', { className: "border border-slate-200 rounded-2xl p-5 bg-slate-50/50 hover:bg-slate-50 transition" },
+              h('h4', { className: "text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5" },
+                h('i', { className: "fa-solid fa-paperclip text-blue-500" }), "上傳參賽檔案 (上限 20MB)"
+              ),
+              h('div', { className: "relative border-2 border-dashed border-slate-200 rounded-xl p-6 text-center bg-white hover:border-blue-400 transition cursor-pointer" },
+                h('input', {
+                  type: "file",
+                  disabled: !isOpen,
+                  onChange: handleFileChange,
+                  className: "absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                }),
+                h('i', { className: "fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2 block" }),
+                h('p', { className: "text-xs sm:text-sm text-slate-600 font-medium" }, "點擊或拖曳檔案至此區域上傳"),
+                h('p', { className: "text-[11px] text-slate-400 mt-1" }, "支援 JPG, PNG, PDF, ZIP, PPT 等各式檔案，限制最高 20MB")
+              ),
+              
+              // 檔案選擇後的純資訊小卡 (此處絕不提前生成縮圖)
+              file && h('div', { className: "mt-4 p-4 bg-white border border-slate-150 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm" },
+                h('div', { className: "flex items-center gap-3.5" },
+                  h('div', { className: "h-12 w-12 rounded-lg flex items-center justify-center text-xl " + (
+                      file.type && file.type.indexOf('image/') === 0 ? 'bg-emerald-50 text-emerald-500' :
+                      file.type && file.type.includes('pdf') ? 'bg-rose-50 text-red-500' :
+                      file.type && file.type.includes('zip') ? 'bg-amber-50 text-amber-500' :
+                      'bg-blue-50 text-blue-500'
+                    )},
+                    h('i', { className: "fa-solid " + (
+                        file.type && file.type.indexOf('image/') === 0 ? 'fa-file-image' :
+                        file.type && file.type.includes('pdf') ? 'fa-file-pdf' :
+                        file.type && file.type.includes('zip') ? 'fa-file-zipper' :
+                        'fa-file-lines'
+                      )})
+                  ),
+                  h('div', { className: "text-left" },
+                    h('p', { className: "text-xs sm:text-sm font-bold text-slate-800" }, file.name),
+                    h('p', { className: "text-[11px] text-slate-400 mt-0.5" }, "檔案大小：" + formatBytes(file.size) + " • 類型：" + file.type)
+                  )
+                ),
+                h('button', {
+                  type: "button",
+                  onClick: function() { setFile(null); },
+                  className: "text-slate-400 hover:text-rose-500 transition px-2 py-1"
+                }, h('i', { className: "fa-regular fa-circle-xmark text-lg" }))
+              )
+            ),
+
+            h('div', { className: "flex justify-end space-x-3 pt-4 border-t border-slate-100" },
+              h('button', {
+                type: "button",
+                disabled: submitting || !isOpen,
+                onClick: function() { handleSave(true); },
+                className: "px-5 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-medium hover:bg-slate-50 transition active:scale-[0.98] disabled:opacity-50 text-sm"
+              }, "儲存為草稿"),
+              h('button', {
+                type: "button",
+                disabled: submitting || !isOpen,
+                onClick: function() { handleSave(false); },
+                className: "px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 transition active:scale-[0.98] disabled:opacity-50 text-sm"
+              }, submitting ? '處理並上傳中...' : '確認送出審查')
+            )
+          )
+        );
+      }
+
+      // ==========================================
+      // 獨立元件 3: 評審端審查評估面板
+      // ==========================================
+      function TeacherReviewForm(props) {
+        var selectedProject = props.selectedProject;
+        var firebaseReady = props.firebaseReady;
+        var db = props.db;
+        var appId = props.appId;
+        var projects = props.projects;
+        var updateProjectsDb = props.updateProjectsDb;
+        var setCurrentView = props.setCurrentView;
+        var setSelectedProject = props.setSelectedProject;
+        var triggerToast = props.triggerToast;
+        var formatBytes = props.formatBytes;
+        var MOCK_STATUSES = props.MOCK_STATUSES;
+
+        var feedbackState = useState('');
+        var feedback = feedbackState[0];
+        var setFeedback = feedbackState[1];
+
+        var updateState = useState(false);
+        var updating = updateState[0];
+        var setUpdating = updateState[1];
+
+        if (!selectedProject) return null;
+
+        var handleUpdateStatus = async function(newStatus) {
+          setUpdating(true);
+
+          if (firebaseReady && db && !String(selectedProject.id).startsWith('local-')) {
+            try {
+              var collectionPath = 'artifacts/' + appId + '/public/data/projects';
+              await db.collection(collectionPath).doc(selectedProject.id).update({
+                status: newStatus,
+                teacherFeedback: feedback || '審查完成，無具體修改意見。'
+              });
+              triggerToast("作品審定決議已更新！狀態：" + MOCK_STATUSES[newStatus].label, "success");
+              setCurrentView('DASHBOARD');
+              setSelectedProject(null);
+            } catch (err) {
+              console.error(err);
+              triggerToast('寫入雲端失敗，請確認資料庫權限是否開啟。', "error");
+            } finally {
+              setUpdating(false);
+            }
+          } else {
+            var updated = projects.map(function(p) {
+              return p.id === selectedProject.id ? Object.assign({}, p, { status: newStatus, teacherFeedback: feedback }) : p;
+            });
+            updateProjectsDb(updated);
+            triggerToast("[模擬審查成功] 狀態改為：" + MOCK_STATUSES[newStatus].label, "success");
+            setCurrentView('DASHBOARD');
+            setSelectedProject(null);
+            setUpdating(false);
+          }
+        };
+
+        return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
+          h('div', { className: "lg:col-span-2 space-y-6" },
+            h('div', { className: "bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100" },
+              h('div', { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-6" },
+                h('div', null,
+                  h('span', { className: "text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-bold" }, selectedProject.category),
+                  h('h2', { className: "text-xl sm:text-2xl font-bold text-slate-800 mt-2" }, selectedProject.title)
+                ),
+                h('span', { className: "px-3 py-1 rounded-full text-xs font-bold self-start sm:self-auto " + (MOCK_STATUSES[selectedProject.status]?.color || 'bg-slate-100 text-slate-700') },
+                  MOCK_STATUSES[selectedProject.status]?.label || selectedProject.status
+                )
+              ),
+              h('div', { className: "grid grid-cols-2 gap-4 text-xs sm:text-sm text-slate-600 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100" },
+                h('p', null, h('span', { className: "text-slate-400 mr-2" }, "參賽學生:"), selectedProject.student),
+                h('p', null, h('span', { className: "text-slate-400 mr-2" }, "所屬單位:"), selectedProject.school),
+                h('p', null, h('span', { className: "text-slate-400 mr-2" }, "指導老師:"), selectedProject.advisor || '無'),
+                h('p', null, h('span', { className: "text-slate-400 mr-2" }, "上傳日期:"), selectedProject.date)
+              ),
+              h('div', { className: "mb-6" },
+                h('h4', { className: "font-bold text-slate-800 mb-2" }, "作品摘要簡介"),
+                h('p', { className: "text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-slate-100" },
+                  selectedProject.summary
+                )
+              ),
+              
+              h('div', { className: "p-4 bg-slate-50 border border-slate-150 rounded-xl" },
+                h('h4', { className: "font-bold text-slate-800 mb-3 flex items-center gap-1.5" },
+                  h('i', { className: "fa-solid fa-file-shield text-blue-500" }), "作品附件與縮圖預覽"
+                ),
+                selectedProject.thumbnail ? h('div', { className: "space-y-3" },
+                  h('div', { className: "text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100 inline-block" },
+                    h('i', { className: "fa-solid fa-image mr-1" }), "安全雲端縮圖已自動生成"
+                  ),
+                  h('img', { 
+                    src: selectedProject.thumbnail, 
+                    className: "max-w-xs h-auto object-contain rounded-xl border border-slate-200 shadow-md hover:scale-105 transition duration-300 bg-white" 
+                  }),
+                  h('p', { className: "text-[11px] text-slate-400 font-mono" }, "上傳歷史紀錄時間：" + (selectedProject.uploadTime || '未知'))
+                ) : h('div', { className: "p-3 bg-white border border-slate-100 rounded-lg flex items-center justify-between shadow-sm" },
+                  h('div', { className: "flex items-center gap-3 text-sm text-slate-700" },
+                    h('i', { className: "fa-solid fa-file-arrow-down text-blue-500 text-lg animate-bounce" }),
+                    h('div', { className: "text-left" },
+                      h('span', { className: "font-bold text-slate-800 block" }, selectedProject.fileName || "作品附檔"),
+                      h('span', { className: "text-[10px] text-slate-400 block font-mono" }, "上傳紀錄時間：" + (selectedProject.uploadTime || '未知'))
+                    )
+                  ),
+                  h('span', { className: "text-xs text-slate-400" }, "檔案大小：" + formatBytes(selectedProject.fileSize))
+                )
+              )
+            )
+          ),
+          h('div', { className: "lg:col-span-1" },
+            h('div', { className: "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6" },
+              h('h3', { className: "text-base font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-1.5" },
+                h('i', { className: "fa-solid fa-feather text-indigo-500" }), "評審審定意見"
+              ),
+              h('div', { className: "space-y-4" },
+                h('div', null,
+                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "評審綜合意見與評語"),
+                  h('textarea', {
+                    rows: "4",
+                    value: feedback,
+                    onChange: function(e) { setFeedback(e.target.value); },
+                    className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-xs transition resize-none",
+                    placeholder: "請填寫對該作品之具體修訂意見或評定評語..."
+                  })
+                ),
+                h('div', { className: "space-y-2 pt-2 border-t border-slate-100" },
+                  h('button', {
+                    disabled: updating,
+                    onClick: function() { handleUpdateStatus('APPROVED'); },
+                    className: "w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition flex items-center justify-center space-x-2 shadow-sm"
+                  }, h('i', { className: "fa-solid fa-circle-check" }), h('span', null, "通過此項審查")),
+                  h('button', {
+                    disabled: updating,
+                    onClick: function() { handleUpdateStatus('REVISION_REQUIRED'); },
+                    className: "w-full py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition flex items-center justify-center space-x-2 shadow-sm"
+                  }, h('i', { className: "fa-solid fa-triangle-exclamation" }), h('span', null, "通知學生補件")),
+                  h('button', {
+                    disabled: updating,
+                    onClick: function() { handleUpdateStatus('REJECTED'); },
+                    className: "w-full py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition flex items-center justify-center space-x-2"
+                  }, h('i', { className: "fa-solid fa-circle-xmark" }), h('span', null, "退回不予通過"))
+                ),
+                h('button', {
+                  onClick: function() { setCurrentView('DASHBOARD'); setSelectedProject(null); },
+                  className: "w-full text-center text-xs text-slate-400 hover:text-slate-600 py-1 transition"
+                }, "取消並返回列表")
+              )
+            )
+          )
+        );
+      }
+
+      // ==========================================
+      // 獨立元件 4: 管理員帳號維護面板
+      // ==========================================
+      function AdminUsersView(props) {
+        var users = props.users;
+        var updateUsersDb = props.updateUsersDb;
+        var firebaseReady = props.firebaseReady;
+        var db = props.db;
+        var appId = props.appId;
+        var triggerToast = props.triggerToast;
+
+        var newUserState = useState({ account: '', password: '', name: '', role: 'STUDENT', school: '' });
+        var newUser = newUserState[0];
+        var setNewUser = newUserState[1];
+        
+        var editingState = useState(false);
+
+        var handleSaveUser = async function() {
+          if (!newUser.account.trim() || !newUser.password.trim() || !newUser.name.trim()) {
+            triggerToast("請填寫完整的帳號、密碼與姓名！", "error");
+            return;
+          }
+
+          var duplicate = users.find(function(u) { return u.account === newUser.account && !editingState[0]; });
+          if (duplicate) {
+            triggerToast("此帳號已存在，不可重複建立！", "error");
+            return;
+          }
+
+          var updatedList = users.filter(function(u) { return u.account !== newUser.account; }).concat(newUser);
+          await updateUsersDb(updatedList);
+          
+          if (firebaseReady && db) {
+            var usersPath = 'artifacts/' + appId + '/public/data/users';
+            await db.collection(usersPath).doc(newUser.account).set(newUser);
+          }
+
+          triggerToast("帳號「" + newUser.name + "」儲存成功！", "success");
+          setNewUser({ account: '', password: '', name: '', role: 'STUDENT', school: '' });
+          editingState[1](false);
+        };
+
+        var handleDeleteUser = async function(account) {
+          if (account === 'admin') {
+            triggerToast("安全警示：預設管理員帳號不予刪除！", "error");
+            return;
+          }
+          if (confirm("確認要刪除此帳號嗎？相關之學生權限將會失效。")) {
+            var updatedList = users.filter(function(u) { return u.account !== account; });
+            await updateUsersDb(updatedList);
+            if (firebaseReady && db) {
+              var usersPath = 'artifacts/' + appId + '/public/data/users';
+              await db.collection(usersPath).doc(account).delete();
+            }
+            triggerToast("帳號已順利刪除。", "success");
+          }
+        };
+
+        return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
+          h('div', { className: "lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100" },
+            h('h3', { className: "text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5" },
+              h('i', { className: "fa-solid fa-users text-blue-500" }), "現有使用者帳號清冊"
+            ),
+            h('div', { className: "overflow-x-auto" },
+              h('table', { className: "w-full text-sm text-left text-slate-600" },
+                h('thead', { className: "bg-slate-50 text-slate-500 font-semibold border-b border-slate-100" },
+                  h('tr', null,
+                    h('th', { className: "py-3 px-4" }, "姓名"),
+                    h('th', { className: "py-3 px-4" }, "帳號"),
+                    h('th', { className: "py-3 px-4" }, "密碼"),
+                    h('th', { className: "py-3 px-4" }, "單位/班級"),
+                    h('th', { className: "py-3 px-4" }, "系統權限"),
+                    h('th', { className: "py-3 px-4 text-right" }, "維護操作")
+                  )
+                ),
+                h('tbody', { className: "divide-y divide-slate-100" },
+                  users.map(function(u) {
+                    return h('tr', { key: u.account, className: "hover:bg-slate-50/50" },
+                      h('td', { className: "py-3 px-4 font-bold text-slate-800" }, u.name),
+                      h('td', { className: "py-3 px-4 text-xs font-mono" }, u.account),
+                      h('td', { className: "py-3 px-4 text-xs font-mono text-slate-400" }, u.password),
+                      h('td', { className: "py-3 px-4 text-xs" }, u.school || '無'),
+                      h('td', { className: "py-3 px-4" }, 
+                        h('span', { className: "px-2 py-0.5 rounded text-[10px] font-bold " + (
+                          u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
+                          u.role === 'TEACHER' ? 'bg-indigo-100 text-indigo-700' :
+                          'bg-blue-100 text-blue-700'
+                        )}, u.role)
+                      ),
+                      h('td', { className: "py-3 px-4 text-right space-x-2" },
+                        h('button', {
+                          onClick: function() { setNewUser(u); editingState[1](true); },
+                          className: "text-blue-600 hover:text-blue-800 text-xs font-bold"
+                        }, "編輯"),
+                        h('button', {
+                          onClick: function() { handleDeleteUser(u.account); },
+                          className: "text-rose-500 hover:text-rose-700 text-xs font-bold"
+                        }, "刪除")
+                      )
+                    );
+                  })
+                )
+              )
+            )
+          ),
+          h('div', { className: "lg:col-span-1" },
+            h('div', { className: "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6" },
+              h('h3', { className: "text-base font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-1.5" },
+                h('i', { className: "fa-solid " + (editingState[0] ? 'fa-user-pen text-amber-500' : 'fa-user-plus text-blue-500') }),
+                editingState[0] ? "修改使用者帳號" : "新增使用者帳號"
+              ),
+              h('div', { className: "space-y-4" },
+                h('div', null,
+                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "姓名"),
+                  h('input', {
+                    type: "text",
+                    value: newUser.name,
+                    onChange: function(e) { setNewUser(Object.assign({}, newUser, { name: e.target.value })); },
+                    className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none",
+                    placeholder: "請輸入姓名"
+                  })
+                ),
+                h('div', null,
+                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "登入帳號 (Account)"),
+                  h('input', {
+                    type: "text",
+                    disabled: editingState[0],
+                    value: newUser.account,
+                    onChange: function(e) { setNewUser(Object.assign({}, newUser, { account: e.target.value })); },
+                    className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none disabled:bg-slate-100 disabled:text-slate-400 font-mono",
+                    placeholder: "請輸入帳號"
+                  })
+                ),
+                h('div', null,
+                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "密碼 (Password)"),
+                  h('input', {
+                    type: "text",
+                    value: newUser.password,
+                    onChange: function(e) { setNewUser(Object.assign({}, newUser, { password: e.target.value })); },
+                    className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none font-mono",
+                    placeholder: "請輸入登入密碼"
+                  })
+                ),
+                h('div', null,
+                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "系統角色"),
+                  h('select', {
+                    value: newUser.role,
+                    onChange: function(e) { setNewUser(Object.assign({}, newUser, { role: e.target.value })); },
+                    className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none bg-white cursor-pointer"
+                  },
+                    h('option', { value: "STUDENT" }, "學生 (投稿者)"),
+                    h('option', { value: "TEACHER" }, "教師 (評審者)"),
+                    h('option', { value: "ADMIN" }, "管理者")
+                  )
+                ),
+                h('div', null,
+                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "班級 / 所屬單位"),
+                  h('input', {
+                    type: "text",
+                    value: newUser.school,
+                    onChange: function(e) { setNewUser(Object.assign({}, newUser, { school: e.target.value })); },
+                    className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none",
+                    placeholder: "例如：資工三甲"
+                  })
+                ),
+                h('div', { className: "pt-4 flex gap-2" },
+                  editingState[0] && h('button', {
+                    onClick: function() { 
+                      setNewUser({ account: '', password: '', name: '', role: 'STUDENT', school: '' }); 
+                      editingState[1](false); 
+                    },
+                    className: "flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition"
+                  }, "取消編輯"),
+                  h('button', {
+                    onClick: handleSaveUser,
+                    className: "flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-md shadow-blue-500/10"
+                  }, "儲存設定")
+                )
+              )
+            )
+          )
+        );
+      }
+
+      // ==========================================
+      // 獨立元件 5: 競賽類別管理面板
+      // ==========================================
+      function AdminCategoriesView(props) {
+        var categories = props.categories;
+        var systemSettings = props.systemSettings;
+        var updateSettingsDb = props.updateSettingsDb;
+        var triggerToast = props.triggerToast;
+
+        var newCatState = useState('');
+
+        var handleAddCat = function() {
+          var val = newCatState[0].trim();
+          if (!val) return;
+          if (categories.indexOf(val) !== -1) {
+            triggerToast("此競賽組別已存在！", "error");
+            return;
+          }
+          var updated = categories.concat(val);
+          updateSettingsDb(systemSettings, updated);
+          triggerToast("競賽類別「" + val + "」新增成功！", "success");
+          newCatState[1]('');
+        };
+
+        var handleDeleteCat = function(c) {
+          if (confirm("確認要刪除「" + c + "」組別類別嗎？")) {
+            var updated = categories.filter(function(cat) { return cat !== c; });
+            updateSettingsDb(systemSettings, updated);
+            triggerToast("類別已成功移除。", "success");
+          }
+        };
+
+        return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
+          h('div', { className: "lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100" },
+            h('h3', { className: "text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5" },
+              h('i', { className: "fa-solid fa-tags text-blue-500" }), "當前開放競賽組別清單"
+            ),
+            h('div', { className: "space-y-2.5" },
+              categories.map(function(c) {
+                return h('div', { key: c, className: "flex justify-between items-center p-3.5 bg-slate-50 border border-slate-150 rounded-xl" },
+                  h('span', { className: "font-bold text-slate-700 text-sm" }, c),
+                  h('button', {
+                    onClick: function() { handleDeleteCat(c); },
+                    className: "text-rose-500 hover:text-rose-700 text-xs font-bold"
+                  }, h('i', { className: "fa-regular fa-trash-can text-base" }))
+                );
+              })
+            )
+          ),
+          h('div', { className: "lg:col-span-1" },
+            h('div', { className: "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6" },
+              h('h3', { className: "text-base font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-1.5" },
+                h('i', { className: "fa-solid fa-plus text-blue-500" }), "追加新增競賽類別"
+              ),
+              h('div', { className: "space-y-4" },
+                h('div', null,
+                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1.5" }, "類別名稱 (如：IOT智慧聯網組)"),
+                  h('input', {
+                    type: "text",
+                    value: newCatState[0],
+                    onChange: function(e) { newCatState[1](e.target.value); },
+                    className: "w-full p-3 border border-slate-200 rounded-xl text-xs outline-none",
+                    placeholder: "請輸入組別名稱"
+                  })
+                ),
+                h('button', {
+                  onClick: handleAddCat,
+                  className: "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-blue-500/10"
+                }, "新增組別")
+              )
+            )
+          )
+        );
+      }
+
+      // ==========================================
+      // 獨立元件 6: 開放投稿時限設定面板
+      // ==========================================
+      function AdminSettingsView(props) {
+        var systemSettings = props.systemSettings;
+        var categories = props.categories;
+        var updateSettingsDb = props.updateSettingsDb;
+        var triggerToast = props.triggerToast;
+
+        var startState = useState(systemSettings.submissionStart);
+        var endState = useState(systemSettings.submissionEnd);
+
+        var handleSaveSettings = function() {
+          var s = startState[0];
+          var e = endState[0];
+          if (!s || !e) {
+            triggerToast("開放起訖日期不可為空！", "error");
+            return;
+          }
+          if (s > e) {
+            triggerToast("截止日期不得早於開始日期！", "error");
+            return;
+          }
+          updateSettingsDb({ submissionStart: s, submissionEnd: e }, categories);
+          triggerToast("投稿開放時段更新儲存成功！", "success");
+        };
+
+        return h('div', { className: "max-w-xl bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100 text-left animate-fade-in" },
+          h('h3', { className: "text-base font-bold text-slate-800 mb-6 border-b pb-3 flex items-center gap-1.5" },
+            h('i', { className: "fa-solid fa-calendar-days text-blue-500" }), "設定學生開放投稿時限"
+          ),
+          h('div', { className: "space-y-6" },
+            h('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-6" },
+              h('div', null,
+                h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "開始投稿日期"),
+                h('input', {
+                  type: "date",
+                  value: startState[0],
+                  onChange: function(e) { startState[1](e.target.value); },
+                  className: "w-full p-3 border border-slate-200 rounded-xl text-sm outline-none"
+                })
+              ),
+              h('div', null,
+                h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "截止投稿日期"),
+                h('input', {
+                  type: "date",
+                  value: endState[0],
+                  onChange: function(e) { endState[1](e.target.value); },
+                  className: "w-full p-3 border border-slate-200 rounded-xl text-sm outline-none"
+                })
+              )
+            ),
+            h('button', {
+              onClick: handleSaveSettings,
+              className: "px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition active:scale-[0.98] shadow-md shadow-blue-500/10"
+            }, "確認儲存設定")
+          )
+        );
+      }
+
+      // ==========================================
+      // 獨立元件 7: 通用參賽列表 (Dashboard)
+      // ==========================================
+      function DashboardList(props) {
+        var currentUser = props.currentUser;
+        var projects = props.projects;
+        var users = props.users;
+        var firebaseReady = props.firebaseReady;
+        var db = props.db;
+        var appId = props.appId;
+        var updateProjectsDb = props.updateProjectsDb;
+        var setCurrentView = props.setCurrentView;
+        var setSelectedProject = props.setSelectedProject;
+        var triggerToast = props.triggerToast;
+        var formatBytes = props.formatBytes;
+        var MOCK_STATUSES = props.MOCK_STATUSES;
+
+        var displayProjects = currentUser.role === 'STUDENT'
+          ? projects.filter(function(p) { return p.studentId === currentUser.account; })
+          : projects;
+
+        var handleDeleteProject = async function(id) {
+          if (confirm("您確認要撤回並刪除這項投稿作品嗎？此操作無法還原。")) {
+            if (firebaseReady && db && !String(id).startsWith('local-')) {
+              try {
+                var collectionPath = 'artifacts/' + appId + '/public/data/projects';
+                await db.collection(collectionPath).doc(id).delete();
+                triggerToast("作品撤回成功！", "success");
+              } catch (e) {
+                triggerToast("撤回失敗", "error");
+              }
+            } else {
+              var updated = projects.filter(function(p) { return p.id !== id; });
+              updateProjectsDb(updated);
+              triggerToast("作品已從本地端成功移除。", "success");
+            }
+          }
+        };
+
+        return h('div', { className: "space-y-6 text-left animate-fade-in" },
+          currentUser.role !== 'STUDENT' && h('div', { className: "grid grid-cols-2 lg:grid-cols-4 gap-4" },
+            h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
+              h('div', { className: "p-2.5 bg-blue-50 text-blue-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-file-invoice w-5 text-center" })),
+              h('div', null,
+                h('p', { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider" }, "總收件件數"),
+                h('p', { className: "text-lg font-black text-slate-800" }, projects.length)
+              )
+            ),
+            h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
+              h('div', { className: "p-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-badge-check w-5 text-center" })),
+              h('div', null,
+                h('p', { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider" }, "審查通過件數"),
+                h('p', { className: "text-lg font-black text-slate-800" }, projects.filter(function(p) { return p.status === 'APPROVED'; }).length)
+              )
+            ),
+            h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
+              h('div', { className: "p-2.5 bg-amber-50 text-amber-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-spinner w-5 text-center animate-spin" })),
+              h('div', null,
+                h('p', { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider" }, "待審理件數"),
+                h('p', { className: "text-lg font-black text-slate-800" }, projects.filter(function(p) { return p.status === 'SUBMITTED' || p.status === 'REVIEWING'; }).length)
+              )
+            ),
+            h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
+              h('div', { className: "p-2.5 bg-rose-50 text-rose-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-users w-5 text-center" })),
+              h('div', null,
+                h('p', { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider" }, "系統總帳號數"),
+                h('p', { className: "text-lg font-black text-slate-800" }, users.length)
+              )
+            )
+          ),
+          h('div', { className: "bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" },
+            h('div', { className: "p-4.5 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4" },
+              h('div', { className: "w-full sm:flex-1 relative" },
+                h('i', { className: "fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 text-xs" }),
+                h('input', {
+                  type: "text",
+                  placeholder: "搜尋參賽作品項目、類別或學生姓名...",
+                  className: "w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition bg-white"
+                })
+              )
+            ),
+            h('div', { className: "overflow-x-auto" },
+              h('table', { className: "w-full text-left text-xs sm:text-sm whitespace-nowrap" },
+                h('thead', { className: "bg-slate-50 text-slate-500 font-bold border-b border-slate-100" },
+                  h('tr', null,
+                    h('th', { className: "py-3 px-6" }, "作品名稱 / 附檔中繼"),
+                    h('th', { className: "py-3 px-6" }, "組別"),
+                    h('th', { className: "py-3 px-6" }, currentUser.role === 'STUDENT' ? '上傳歷史日期' : '投稿學生資訊'),
+                    h('th', { className: "py-3 px-6 text-center" }, "狀態"),
+                    h('th', { className: "py-3 px-6 text-right" }, "操作項目")
+                  )
+                ),
+                h('tbody', { className: "divide-y divide-slate-100" },
+                  displayProjects.length === 0 ? h('tr', null,
+                    h('td', { colSpan: "5", className: "py-10 text-center text-slate-400 font-bold" },
+                      h('i', { className: "fa-solid fa-inbox text-3xl mb-2.5 block" }),
+                      "目前尚無投稿作品紀錄。"
+                    )
+                  ) : displayProjects.map(function(project) {
+                    return h('tr', { key: project.id, className: "hover:bg-slate-50/30 transition" },
+                      h('td', { className: "py-4 px-6 font-semibold text-slate-800" },
+                        h('div', { className: "flex items-center gap-3.5" },
+                          project.thumbnail ? h('img', { src: project.thumbnail, className: "h-9 w-9 object-cover rounded-lg border shadow-sm bg-white" })
+                          : h('div', { className: "h-9 w-9 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500 text-sm" },
+                              h('i', { className: "fa-solid " + (project.fileType && project.fileType.includes('pdf') ? 'fa-file-pdf text-red-500' : 'fa-file-lines') })
+                            ),
+                          h('div', { className: "max-w-xs sm:max-w-md" },
+                            h('p', { className: "truncate text-slate-800 font-bold" }, project.title),
+                            h('p', { className: "text-[10px] text-slate-400 font-mono mt-0.5" }, (project.fileName || '無附檔') + " (" + formatBytes(project.fileSize) + ")")
+                          )
+                        )
+                      ),
+                      h('td', { className: "py-4 px-6 text-slate-500 font-medium text-xs" }, project.category),
+                      h('td', { className: "py-4 px-6 text-slate-500" },
+                        currentUser.role === 'STUDENT' ? h('div', null,
+                          h('p', { className: "font-semibold text-slate-700" }, project.date),
+                          h('p', { className: "text-[10px] text-slate-400 font-mono" }, "上傳時間：" + (project.uploadTime || '未知'))
+                        ) : h('div', null,
+                          h('p', { className: "font-bold text-slate-700" }, project.student),
+                          h('p', { className: "text-[10px] text-slate-400 font-mono" }, project.school + " • " + (project.uploadTime || '未知'))
+                        )
+                      ),
+                      h('td', { className: "py-4 px-6 text-center" },
+                        h('span', { className: "px-3 py-1 rounded-full text-[10px] font-bold inline-block shadow-sm " + (MOCK_STATUSES[project.status]?.color || 'bg-slate-100 text-slate-700') },
+                          MOCK_STATUSES[project.status]?.label || project.status
+                        )
+                      ),
+                      h('td', { className: "py-4 px-6 text-right text-xs" },
+                        currentUser.role === 'TEACHER' ? h('button', {
+                          onClick: function() { setSelectedProject(project); setCurrentView('REVIEW_FORM'); },
+                          className: "bg-blue-50 text-blue-600 font-bold px-3.5 py-2 rounded-xl hover:bg-blue-100 active:scale-95 transition mr-2"
+                        },
+                          h('i', { className: "fa-solid fa-magnifying-glass mr-1" }), "審查評估"
+                        ) : h('div', { className: "space-x-2" },
+                          h('button', {
+                            onClick: function() { 
+                              var feedbackMsg = project.teacherFeedback ? "\n評審建議意見：\n" + project.teacherFeedback : "\n評審尚未填寫修改意見。";
+                              alert("【作品項目名稱】\n" + project.title + "\n\n組別：" + project.category + "\n狀態：" + MOCK_STATUSES[project.status]?.label + "\n指導老師：" + project.advisor + "\n" + feedbackMsg); 
+                            },
+                            className: "text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 transition"
+                          }, "詳情"),
+                          currentUser.role === 'STUDENT' && h('button', {
+                            onClick: function() { handleDeleteProject(project.id); },
+                            className: "text-rose-500 hover:text-rose-700 font-bold px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 transition"
+                          }, "撤回")
+                        )
+                      )
+                    );
+                  })
+                )
+              )
+            )
+          )
+        );
+      }
+
+      // ==========================================
+      // 獨立元件 8: 系統主體佈局 (Layout) (💡 補回的核心元件)
+      // ==========================================
+      function Layout(props) {
+        var currentUser = props.currentUser;
+        var currentView = props.currentView;
+        var setCurrentView = props.setCurrentView;
+        var setSelectedProject = props.setSelectedProject;
+        var systemSettings = props.systemSettings;
+        var handleLogout = props.handleLogout;
+        var toast = props.toast;
+        var statusBanner = props.statusBanner;
+        var children = props.children;
+
+        return h('div', { className: "min-h-screen bg-slate-50 flex flex-col font-sans antialiased relative" },
+          // Toast 提示
+          toast.show && h('div', { className: "fixed top-5 left-1/2 transform -translate-x-1/2 z-50 animate-bounce" },
+            h('div', { className: "px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold flex items-center gap-2 border " + (
+              toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+              toast.type === 'error' ? 'bg-rose-50 text-rose-800 border-rose-200' :
+              'bg-blue-50 text-blue-800 border-blue-200'
+            )},
+              h('i', { className: "fa-solid " + (
+                toast.type === 'success' ? 'fa-circle-check text-emerald-500' :
+                toast.type === 'error' ? 'fa-circle-xmark text-rose-500' :
+                'fa-circle-info text-blue-500'
+              )}),
+              toast.message
+            )
+          ),
+          // Banner 橫幅
+          statusBanner.text && h('div', { className: "px-4 py-2.5 text-xs sm:text-sm text-center font-bold border-b transition-all duration-300 " + (
+            statusBanner.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+            statusBanner.type === 'warning' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+            'bg-blue-50 text-blue-800 border-blue-200'
+          )},
+            h('i', { className: "mr-2 fa-solid " + (
+              statusBanner.type === 'success' ? 'fa-circle-check text-emerald-500' :
+              statusBanner.type === 'warning' ? 'fa-triangle-exclamation text-amber-500' :
+              'fa-circle-info text-blue-500'
+            )}),
+            statusBanner.text
+          ),
+          // 主體結構
+          h('div', { className: "flex flex-col md:flex-row flex-1 overflow-hidden" },
+            // 側邊欄
+            h('aside', { className: "w-full md:w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 shadow-lg" },
+              h('div', { className: "p-6 border-b border-slate-800 flex items-center justify-between" },
+                h('div', null,
+                  h('h1', { className: "text-lg sm:text-xl font-bold leading-tight tracking-wide text-white flex items-center gap-2" }, 
+                    h('i', { className: "fa-solid fa-circle-nodes text-blue-500" }),
+                    "資訊競賽平台"
+                  ),
+                  h('p', { className: "text-[10px] text-slate-400 mt-1" }, "HSES Competition Portal")
+                )
+              ),
+              h('div', { className: "p-4 flex-1 flex flex-col space-y-6" },
+                // 目前登入者資訊
+                h('div', { className: "bg-slate-800/50 p-3.5 rounded-xl border border-slate-700/50" },
+                  h('div', { className: "flex items-center gap-3" },
+                    h('div', { className: "h-9 w-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md" },
+                      currentUser ? currentUser.name.charAt(0) : 'U'
+                    ),
+                    h('div', { className: "truncate" },
+                      h('p', { className: "text-xs text-slate-400 font-medium" }, 
+                        currentUser ? (currentUser.role === 'ADMIN' ? '🛡️ 系統管理者' : currentUser.role === 'TEACHER' ? '👨‍🏫 評審委員' : '👨‍🎓 參賽學生') : '未登入'
+                      ),
+                      h('p', { className: "text-sm font-bold text-slate-100 truncate mt-0.5" }, currentUser ? currentUser.name : '訪客')
+                    )
+                  )
+                ),
+                
+                // 導覽按鈕
+                h('nav', { className: "space-y-1 flex-1" },
+                  // 通用：平台總覽 (學生、教師、管理員皆可用，但視角不同)
+                  h('button', {
+                    onClick: function() { setCurrentView('DASHBOARD'); setSelectedProject(null); },
+                    className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
+                      currentView === 'DASHBOARD' || currentView === 'REVIEW_FORM' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    )
+                  },
+                    h('i', { className: "fa-solid fa-table-columns w-5 text-center" }),
+                    h('span', null, currentUser.role === 'STUDENT' ? '我的參賽作品' : currentUser.role === 'TEACHER' ? '待評審作品' : '平台數據總覽')
+                  ),
+
+                  // 學生專用：新增投稿
+                  currentUser.role === 'STUDENT' && h('button', {
+                    onClick: function() { setCurrentView('SUBMIT_FORM'); },
+                    className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
+                      currentView === 'SUBMIT_FORM' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    )
+                  },
+                    h('i', { className: "fa-solid fa-cloud-arrow-up w-5 text-center" }),
+                    h('span', null, "新增競賽投稿")
+                  ),
+
+                  // 管理員專用群組
+                  currentUser.role === 'ADMIN' && h('div', { className: "space-y-1.5 pt-4 border-t border-slate-800" },
+                    h('p', { className: "text-[10px] text-slate-500 font-bold px-3 uppercase tracking-wider mb-2" }, "系統維護工具"),
+                    h('button', {
+                      onClick: function() { setCurrentView('ADMIN_USERS'); },
+                      className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
+                        currentView === 'ADMIN_USERS' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      )
+                    },
+                      h('i', { className: "fa-solid fa-users-gear w-5 text-center" }),
+                      h('span', null, "帳號管理")
+                    ),
+                    h('button', {
+                      onClick: function() { setCurrentView('ADMIN_CATEGORIES'); },
+                      className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
+                        currentView === 'ADMIN_CATEGORIES' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      )
+                    },
+                      h('i', { className: "fa-solid fa-tags w-5 text-center" }),
+                      h('span', null, "競賽類別管理")
+                    ),
+                    h('button', {
+                      onClick: function() { setCurrentView('ADMIN_SETTINGS'); },
+                      className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
+                        currentView === 'ADMIN_SETTINGS' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      )
+                    },
+                      h('i', { className: "fa-solid fa-clock w-5 text-center" }),
+                      h('span', null, "開放投稿設定")
+                    )
+                  )
+                ),
+                
+                // 登出按鈕
+                h('div', { className: "pt-4 border-t border-slate-800" },
+                  h('button', {
+                    onClick: handleLogout,
+                    className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium text-rose-400 hover:bg-rose-950/30 hover:text-rose-300 transition-all"
+                  },
+                    h('i', { className: "fa-solid fa-right-from-bracket w-5 text-center" }),
+                    h('span', null, "安全登出")
+                  )
+                )
+              )
+            ),
+            // 主顯示區
+            h('main', { className: "flex-1 overflow-y-auto bg-slate-50 flex flex-col" },
+              h('header', { className: "bg-white shadow-sm h-16 flex items-center justify-between px-6 sm:px-8 border-b border-slate-100 flex-shrink-0" },
+                h('h2', { className: "text-base sm:text-lg font-black text-slate-800" },
+                  currentView === 'DASHBOARD' && (currentUser.role === 'STUDENT' ? '📁 我的參賽作品列表' : currentUser.role === 'TEACHER' ? '📥 待評審作品審核' : '📊 競賽數據總覽'),
+                  currentView === 'SUBMIT_FORM' && '✍️ 新增競賽投稿作品',
+                  currentView === 'REVIEW_FORM' && '🔍 評審作品審查與評分',
+                  currentView === 'ADMIN_USERS' && '👥 參賽者與教師帳號維護',
+                  currentView === 'ADMIN_CATEGORIES' && '🏷️ 競賽組別類別管理',
+                  currentView === 'ADMIN_SETTINGS' && '📅 開放投稿時間設定'
+                ),
+                h('div', { className: "text-xs text-slate-500 font-medium" },
+                  "開放上傳期間：" + systemSettings.submissionStart + " 至 " + systemSettings.submissionEnd
+                )
+              ),
+              h('div', { className: "p-4 sm:p-8 flex-1" }, children)
+            )
+          )
+        );
+      }
+
+      // ==========================================
+      // 核心主程式 (App)
+      // ==========================================
       function App() {
-        // 使用者與帳號狀態
         var currentUserState = useState(null);
         var currentUser = currentUserState[0];
         var setCurrentUser = currentUserState[1];
@@ -103,7 +1240,6 @@
         var users = usersState[0];
         var setUsers = usersState[1];
 
-        // 系統與競賽狀態
         var categoriesState = useState(DEFAULT_CATEGORIES);
         var categories = categoriesState[0];
         var setCategories = categoriesState[1];
@@ -119,8 +1255,7 @@
         var projects = projectsState[0];
         var setProjects = projectsState[1];
 
-        // 導覽與操作狀態
-        var currentViewState = useState('LOGIN'); // LOGIN, DASHBOARD, SUBMIT_FORM, REVIEW_FORM, ADMIN_USERS, ADMIN_CATEGORIES, ADMIN_SETTINGS
+        var currentViewState = useState('LOGIN'); 
         var currentView = currentViewState[0];
         var setCurrentView = currentViewState[1];
 
@@ -128,7 +1263,6 @@
         var selectedProject = selectedProjectState[0];
         var setSelectedProject = selectedProjectState[1];
 
-        // UI 提示狀態
         var statusBannerState = useState({ type: 'info', text: '系統安全加載中...' });
         var statusBanner = statusBannerState[0];
         var setStatusBanner = statusBannerState[1];
@@ -145,14 +1279,12 @@
           }, 4000);
         };
 
-        // 1. Firebase 匿名登入與初始化
         useEffect(function() {
           if (!firebaseReady || !auth) {
             setStatusBanner({ 
               type: 'warning', 
               text: '💡 目前處於「本地安全快取模式」。系統全功能皆已啟用，資料將安全保存在 LocalStorage 中。' 
             });
-            // 載入 LocalStorage 預設使用者資料
             var localUsers = localStorage.getItem('hses_users');
             if (!localUsers) {
               localStorage.setItem('hses_users', JSON.stringify(SEED_USERS));
@@ -160,13 +1292,11 @@
             } else {
               setUsers(JSON.parse(localUsers));
             }
-            // 載入本地競賽類別與設定
             var localCats = localStorage.getItem('hses_categories');
             if (localCats) setCategories(JSON.parse(localCats));
             var localSettings = localStorage.getItem('hses_settings');
             if (localSettings) setSystemSettings(JSON.parse(localSettings));
             
-            // 載入本地作品
             var localProjects = localStorage.getItem('hses_projects');
             if (localProjects) {
               setProjects(JSON.parse(localProjects));
@@ -185,22 +1315,19 @@
               console.error('Firebase 登入失敗:', error);
               setStatusBanner({ 
                 type: 'warning', 
-                text: '⚠️ 雲端連線失敗，自動降級為本地安全快取模式（請確認 Firebase 匿名驗證已開啟）。' 
+                text: '⚠️ 雲端連線失敗，自動降級為本地安全快取模式。' 
               });
             }
           };
           runAuth();
         }, []);
 
-        // 2. 雲端資料庫 Firestore 資料即時訂閱監聽
         useEffect(function() {
           if (!firebaseReady || !db) return;
 
-          // (1) 訂閱使用者帳號
           var usersPath = 'artifacts/' + appId + '/public/data/users';
           var unsubUsers = db.collection(usersPath).onSnapshot(function(snapshot) {
             if (snapshot.empty) {
-              // 寫入種子資料
               SEED_USERS.forEach(function(u) {
                 db.collection(usersPath).doc(u.account).set(u);
               });
@@ -208,11 +1335,8 @@
               var data = snapshot.docs.map(function(doc) { return doc.data(); });
               setUsers(data);
             }
-          }, function(err) {
-            console.error("無法同步帳號列表:", err);
           });
 
-          // (2) 訂閱競賽與系統設定
           var settingsPath = 'artifacts/' + appId + '/public/data/settings';
           var unsubSettings = db.collection(settingsPath).doc('system_config').onSnapshot(function(doc) {
             if (doc.exists) {
@@ -225,18 +1349,14 @@
                 });
               }
             } else {
-              // 初始化預設值
               db.collection(settingsPath).doc('system_config').set({
                 categories: DEFAULT_CATEGORIES,
                 submissionStart: '2026-06-01',
                 submissionEnd: '2026-06-30'
               });
             }
-          }, function(err) {
-            console.error("無法同步系統設定:", err);
           });
 
-          // (3) 訂閱投稿作品 (最關鍵修復點：確保學生的上傳能在雙端即時監聽與呈現)
           var projectsPath = 'artifacts/' + appId + '/public/data/projects';
           var unsubProjects = db.collection(projectsPath).onSnapshot(function(snapshot) {
             if (!snapshot.empty) {
@@ -249,10 +1369,6 @@
             }
           }, function(err) {
             console.error("無法同步作品列表:", err);
-            setStatusBanner({ 
-              type: 'warning', 
-              text: '🔒 Firebase 阻擋了資料讀取。請至 Firestore 的 Rules 將規則修改為允許讀寫。' 
-            });
           });
 
           return function() {
@@ -262,7 +1378,6 @@
           };
         }, [firebaseReady]);
 
-        // 資料寫入與同步輔助函數
         var updateUsersDb = async function(updatedList) {
           setUsers(updatedList);
           if (!firebaseReady || !db) {
@@ -293,7 +1408,6 @@
           }
         };
 
-        // 登入處理
         var handleLogin = function(account, password) {
           var matched = users.find(function(u) {
             return u.account === account.trim() && u.password === password;
@@ -307,7 +1421,6 @@
           }
         };
 
-        // 登出處理
         var handleLogout = function() {
           setCurrentUser(null);
           setCurrentView('LOGIN');
@@ -315,13 +1428,11 @@
           triggerToast("您已成功登出系統。", "info");
         };
 
-        // 判斷投稿時間是否開放
         var checkSubmissionOpen = function() {
           var today = new Date().toISOString().split('T')[0];
           return today >= systemSettings.submissionStart && today <= systemSettings.submissionEnd;
         };
 
-        // 格式化位元組大小
         var formatBytes = function(bytes) {
           if (!bytes || bytes === 0) return '0 Bytes';
           var k = 1024;
@@ -330,1071 +1441,110 @@
           return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         };
 
-        // ==========================================
-        // 渲染：登入介面
-        // ==========================================
-        var LoginView = function() {
-          var accState = useState('');
-          var pwState = useState('');
-          
-          return h('div', { className: "min-h-screen flex flex-col justify-center items-center px-4 bg-gradient-to-tr from-slate-100 to-slate-200" },
-            h('div', { className: "w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-slate-100" },
-              h('div', { className: "text-center mb-8" },
-                h('div', { className: "mx-auto h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 text-2xl mb-3 shadow-inner" },
-                  h('i', { className: "fa-solid fa-graduation-cap" })
-                ),
-                h('h2', { className: "text-2xl font-black text-slate-800 tracking-wide" }, "競賽作品投稿平台"),
-                h('p', { className: "text-xs text-slate-400 mt-1.5" }, "HSES Student Information Competition")
-              ),
-              h('div', { className: "space-y-4" },
-                h('div', null,
-                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1.5 uppercase" }, "使用者帳號"),
-                  h('div', { className: "relative" },
-                    h('i', { className: "fa-solid fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" }),
-                    h('input', {
-                      type: "text",
-                      value: accState[0],
-                      onChange: function(e) { accState[1](e.target.value); },
-                      className: "w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm text-slate-700",
-                      placeholder: "請輸入帳號"
-                    })
-                  )
-                ),
-                h('div', null,
-                  h('label', { className: "block text-xs font-bold text-slate-500 mb-1.5 uppercase" }, "密碼"),
-                  h('div', { className: "relative" },
-                    h('i', { className: "fa-solid fa-lock absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm" }),
-                    h('input', {
-                      type: "password",
-                      value: pwState[0],
-                      onChange: function(e) { pwState[1](e.target.value); },
-                      className: "w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm text-slate-700",
-                      placeholder: "請輸入密碼",
-                      onKeyDown: function(e) { if (e.key === 'Enter') handleLogin(accState[0], pwState[0]); }
-                    })
-                  )
-                ),
-                h('button', {
-                  onClick: function() { handleLogin(accState[0], pwState[0]); },
-                  className: "w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition shadow-lg shadow-blue-500/10 active:scale-[0.98] mt-2 text-sm"
-                }, "安全登入")
-              )
-            ),
-            // 系統測試帳號資訊盒
-            h('div', { className: "w-full max-w-md mt-6 bg-slate-100 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 shadow-sm" },
-              h('p', { className: "font-bold text-slate-700 mb-2 flex items-center gap-1.5" },
-                h('i', { className: "fa-solid fa-circle-info text-blue-500" }), "💡 系統內置展示帳號資訊（可直接測試登入）："
-              ),
-              h('div', { className: "grid grid-cols-3 gap-2" },
-                h('div', { className: "bg-white p-2 rounded border border-slate-200" },
-                  h('p', { className: "font-bold text-slate-800" }, "🛡️ 管理者"),
-                  h('p', null, "帳號: admin"),
-                  h('p', null, "密碼: admin123")
-                ),
-                h('div', { className: "bg-white p-2 rounded border border-slate-200" },
-                  h('p', { className: "font-bold text-slate-800" }, "👨‍🏫 評審委員"),
-                  h('p', null, "帳號: teacher"),
-                  h('p', null, "密碼: teacher123")
-                ),
-                h('div', { className: "bg-white p-2 rounded border border-slate-200" },
-                  h('p', { className: "font-bold text-slate-800" }, "👨‍🎓 參賽學生"),
-                  h('p', null, "帳號: student"),
-                  h('p', null, "密碼: student123")
-                )
-              )
-            )
-          );
-        };
-
-        // ==========================================
-        // 佈局框架元件 (Layout)
-        // ==========================================
-        var Layout = function(props) {
-          return h('div', { className: "min-h-screen bg-slate-50 flex flex-col font-sans antialiased relative" },
-            // Toast 浮動提示
-            toast.show && h('div', { className: "fixed top-5 left-1/2 transform -translate-x-1/2 z-50 animate-bounce" },
-              h('div', { className: "px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold flex items-center gap-2 border " + (
-                toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                toast.type === 'error' ? 'bg-rose-50 text-rose-800 border-rose-200' :
-                'bg-blue-50 text-blue-800 border-blue-200'
-              )},
-                h('i', { className: "fa-solid " + (
-                  toast.type === 'success' ? 'fa-circle-check text-emerald-500' :
-                  toast.type === 'error' ? 'fa-circle-xmark text-rose-500' :
-                  'fa-circle-info text-blue-500'
-                )}),
-                toast.message
-              )
-            ),
-            // 雲端同步 Banner 提示
-            statusBanner.text && h('div', { className: "px-4 py-2.5 text-xs sm:text-sm text-center font-bold border-b transition-all duration-300 " + (
-              statusBanner.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-              statusBanner.type === 'warning' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-              'bg-blue-50 text-blue-800 border-blue-200'
-            )},
-              h('i', { className: "mr-2 fa-solid " + (
-                statusBanner.type === 'success' ? 'fa-circle-check text-emerald-500' :
-                statusBanner.type === 'warning' ? 'fa-triangle-exclamation text-amber-500' :
-                'fa-circle-info text-blue-500'
-              )}),
-              statusBanner.text
-            ),
-            // 主體結構
-            h('div', { className: "flex flex-col md:flex-row flex-1 overflow-hidden" },
-              // 側邊欄
-              h('aside', { className: "w-full md:w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 shadow-lg" },
-                h('div', { className: "p-6 border-b border-slate-800 flex items-center justify-between" },
-                  h('div', null,
-                    h('h1', { className: "text-lg sm:text-xl font-bold leading-tight tracking-wide text-white flex items-center gap-2" }, 
-                      h('i', { className: "fa-solid fa-circle-nodes text-blue-500" }),
-                      "資訊競賽平台"
-                    ),
-                    h('p', { className: "text-[10px] text-slate-400 mt-1" }, "HSES Competition Portal")
-                  )
-                ),
-                h('div', { className: "p-4 flex-1 flex flex-col space-y-6" },
-                  // 目前登入者資訊
-                  h('div', { className: "bg-slate-800/50 p-3.5 rounded-xl border border-slate-700/50" },
-                    h('div', { className: "flex items-center gap-3" },
-                      h('div', { className: "h-9 w-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md" },
-                        currentUser ? currentUser.name.charAt(0) : 'U'
-                      ),
-                      h('div', { className: "truncate" },
-                        h('p', { className: "text-xs text-slate-400 font-medium" }, 
-                          currentUser ? (currentUser.role === 'ADMIN' ? '🛡️ 系統管理者' : currentUser.role === 'TEACHER' ? '👨‍🏫 評審委員' : '👨‍🎓 參賽學生') : '未登入'
-                        ),
-                        h('p', { className: "text-sm font-bold text-slate-100 truncate mt-0.5" }, currentUser ? currentUser.name : '訪客')
-                      )
-                    )
-                  ),
-                  
-                  // 導覽按鈕
-                  h('nav', { className: "space-y-1 flex-1" },
-                    // 通用：平台總覽 (學生、教師、管理員皆可用，但視角不同)
-                    h('button', {
-                      onClick: function() { setCurrentView('DASHBOARD'); setSelectedProject(null); },
-                      className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
-                        currentView === 'DASHBOARD' || currentView === 'REVIEW_FORM' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                      )
-                    },
-                      h('i', { className: "fa-solid fa-table-columns w-5 text-center" }),
-                      h('span', null, currentUser.role === 'STUDENT' ? '我的參賽作品' : currentUser.role === 'TEACHER' ? '待評審作品' : '平台數據總覽')
-                    ),
-
-                    // 學生專用：新增投稿
-                    currentUser.role === 'STUDENT' && h('button', {
-                      onClick: function() { setCurrentView('SUBMIT_FORM'); },
-                      className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
-                        currentView === 'SUBMIT_FORM' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                      )
-                    },
-                      h('i', { className: "fa-solid fa-cloud-arrow-up w-5 text-center" }),
-                      h('span', null, "新增競賽投稿")
-                    ),
-
-                    // 管理員專用群組
-                    currentUser.role === 'ADMIN' && h('div', { className: "space-y-1.5 pt-4 border-t border-slate-800" },
-                      h('p', { className: "text-[10px] text-slate-500 font-bold px-3 uppercase tracking-wider mb-2" }, "系統維護工具"),
-                      h('button', {
-                        onClick: function() { setCurrentView('ADMIN_USERS'); },
-                        className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
-                          currentView === 'ADMIN_USERS' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                        )
-                      },
-                        h('i', { className: "fa-solid fa-users-gear w-5 text-center" }),
-                        h('span', null, "帳號管理")
-                      ),
-                      h('button', {
-                        onClick: function() { setCurrentView('ADMIN_CATEGORIES'); },
-                        className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
-                          currentView === 'ADMIN_CATEGORIES' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                        )
-                      },
-                        h('i', { className: "fa-solid fa-tags w-5 text-center" }),
-                        h('span', null, "競賽類別管理")
-                      ),
-                      h('button', {
-                        onClick: function() { setCurrentView('ADMIN_SETTINGS'); },
-                        className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium transition-all " + (
-                          currentView === 'ADMIN_SETTINGS' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                        )
-                      },
-                        h('i', { className: "fa-solid fa-clock w-5 text-center" }),
-                        h('span', null, "開放投稿設定")
-                      )
-                    )
-                  ),
-                  
-                  // 登出按鈕
-                  h('div', { className: "pt-4 border-t border-slate-800" },
-                    h('button', {
-                      onClick: handleLogout,
-                      className: "w-full flex items-center space-x-3 p-3 rounded-xl text-sm font-medium text-rose-400 hover:bg-rose-950/30 hover:text-rose-300 transition-all"
-                    },
-                      h('i', { className: "fa-solid fa-right-from-bracket w-5 text-center" }),
-                      h('span', null, "安全登出")
-                    )
-                  )
-                )
-              ),
-              // 主顯示區
-              h('main', { className: "flex-1 overflow-y-auto bg-slate-50 flex flex-col" },
-                h('header', { className: "bg-white shadow-sm h-16 flex items-center justify-between px-6 sm:px-8 border-b border-slate-100 flex-shrink-0" },
-                  h('h2', { className: "text-base sm:text-lg font-black text-slate-800" },
-                    currentView === 'DASHBOARD' && (currentUser.role === 'STUDENT' ? '📁 我的參賽作品列表' : currentUser.role === 'TEACHER' ? '📥 待評審作品審核' : '📊 競賽數據總覽'),
-                    currentView === 'SUBMIT_FORM' && '✍️ 新增競賽投稿作品',
-                    currentView === 'REVIEW_FORM' && '🔍 評審作品審查與評分',
-                    currentView === 'ADMIN_USERS' && '👥 參賽者與教師帳號維護',
-                    currentView === 'ADMIN_CATEGORIES' && '🏷️ 競賽組別類別管理',
-                    currentView === 'ADMIN_SETTINGS' && '📅 開放投稿時間設定'
-                  ),
-                  h('div', { className: "text-xs text-slate-500 font-medium" },
-                    "開放上傳期間：" + systemSettings.submissionStart + " 至 " + systemSettings.submissionEnd
-                  )
-                ),
-                h('div', { className: "p-4 sm:p-8 flex-1" }, props.children)
-              )
-            )
-          );
-        };
-
-        // ==========================================
-        // 學生端投稿表單 (可上傳檔案，限20MB，支援圖檔自動壓縮縮圖)
-        // ==========================================
-        var StudentSubmitForm = function() {
-          var formState = useState({ title: '', category: categories[0] || '', summary: '' });
-          var formData = formState[0];
-          var setFormData = formState[1];
-
-          // 💡 修正：使用單純的 file 物件狀態，不再預先生成 Base64 縮圖與呈現
-          var fileState = useState(null); 
-          var file = fileState[0];
-          var setFile = fileState[1];
-
-          var submitState = useState(false);
-          var submitting = submitState[0];
-          var setSubmitting = submitState[1];
-
-          // 檢查投稿時間是否開放
-          var isOpen = checkSubmissionOpen();
-
-          var handleFileChange = function(e) {
-            var selectedFile = e.target.files[0];
-            if (!selectedFile) return;
-
-            // 限制 20MB
-            var maxLimit = 20 * 1024 * 1024;
-            if (selectedFile.size > maxLimit) {
-              triggerToast("檔案超過 20MB 上限限制！請選擇較小的檔案。", "error");
-              e.target.value = null; // 清空選擇
-              return;
-            }
-
-            // 僅暫存原始檔案，此處絕不提前載入縮圖
-            setFile(selectedFile);
-            triggerToast("檔案已成功載入！按下送出後系統會自動為圖檔生成審核縮圖。", "success");
-          };
-
-          var handleSave = async function(isDraft) {
-            if (!isOpen) {
-              triggerToast("目前非開放投稿時間，禁止新增投稿！", "error");
-              return;
-            }
-
-            if (!formData.title.trim()) {
-              triggerToast("請輸入作品名稱！", "error");
-              return;
-            }
-
-            if (!file) {
-              triggerToast("請上傳您的作品檔案 (限20MB內)！", "error");
-              return;
-            }
-            
-            setSubmitting(true);
-            var targetStatus = isDraft ? 'DRAFT' : 'SUBMITTED';
-            var uploadTimeStr = new Date().toLocaleString('zh-TW', { hour12: true });
-
-            // 核心儲存邏輯
-            var executeSave = async function(thumbnailBase64) {
-              var newProject = {
-                title: formData.title,
-                category: formData.category,
-                school: currentUser.school || '資工三甲',
-                student: currentUser.name,
-                studentId: currentUser.account, // 對應當前登入學生的帳號
-                advisor: formData.advisor || '無',
-                summary: formData.summary || '未提供作品摘要。',
-                date: new Date().toISOString().split('T')[0],
-                uploadTime: uploadTimeStr,
-                fileName: file.name,
-                fileSize: file.size,
-                fileType: file.type,
-                thumbnail: thumbnailBase64 || '', // 儲存經壓縮後的 Base64 數據
-                status: targetStatus
-              };
-
-              if (firebaseReady && db) {
-                try {
-                  var collectionPath = 'artifacts/' + appId + '/public/data/projects';
-                  await db.collection(collectionPath).add(newProject);
-                  triggerToast(isDraft ? '草稿儲存成功！' : '參賽作品已成功上傳並發送至雲端審核！', "success");
-                  setCurrentView('DASHBOARD');
-                } catch (err) {
-                  console.error(err);
-                  triggerToast('雲端儲存失敗，請檢查 Firestore 安全規則是否允許寫入。', "error");
-                } finally {
-                  setSubmitting(false);
-                }
-              } else {
-                // 本地端儲存與備援
-                var simulatedId = 'local-' + Date.now();
-                var updatedList = [Object.assign({ id: simulatedId }, newProject)].concat(projects);
-                updateProjectsDb(updatedList);
-                triggerToast("[本地儲存成功] " + (isDraft ? '草稿已暫存！' : '參賽作品已發布！'), "success");
-                setCurrentView('DASHBOARD');
-                setSubmitting(false);
-              }
-            };
-
-            // 💡 修正：在按下「送出審查」或「儲存草稿」那一瞬間，才在背景處理圖片並生成評分縮圖
-            if (file.type.startsWith('image/')) {
-              triggerToast("系統正在在背景安全生成評定縮圖中，請稍候...", "info");
-              var reader = new FileReader();
-              reader.onload = function(event) {
-                var img = new Image();
-                img.onload = function() {
-                  var canvas = document.createElement('canvas');
-                  var max_width = 320; // 壓縮縮圖寬度以保證相容 Firestore 體積
-                  var scale = max_width / img.width;
-                  canvas.width = max_width;
-                  canvas.height = img.height * scale;
-                  var ctx = canvas.getContext('2d');
-                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                  
-                  // 將高畫質輕量 JPG 生成 Base64
-                  var compressedBase64 = canvas.toDataURL('image/jpeg', 0.6); 
-                  executeSave(compressedBase64);
-                };
-                img.src = event.target.result;
-              };
-              reader.readAsDataURL(file);
-            } else {
-              // 非圖檔則直接儲存
-              executeSave('');
-            }
-          };
-
-          return h('div', { className: "max-w-3xl bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100" },
-            !isOpen && h('div', { className: "mb-6 bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl text-sm font-bold flex items-center gap-2" },
-              h('i', { className: "fa-solid fa-triangle-exclamation text-lg" }),
-              "⚠️ 目前「非開放投稿期間」！開放時段為：" + systemSettings.submissionStart + " 至 " + systemSettings.submissionEnd
-            ),
-            h('div', { className: "space-y-6" },
-              h('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-6" },
-                h('div', null,
-                  h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "作品名稱 ", h('span', { className: "text-red-500" }, "*")),
-                  h('input', {
-                    type: "text",
-                    disabled: !isOpen,
-                    value: formData.title,
-                    onChange: function(e) { setFormData(Object.assign({}, formData, { title: e.target.value })); },
-                    className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm disabled:bg-slate-100",
-                    placeholder: "例如：智慧防護居家物聯網平台"
-                  })
-                ),
-                h('div', null,
-                  h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "競賽組別 ", h('span', { className: "text-red-500" }, "*")),
-                  h('select', {
-                    disabled: !isOpen,
-                    value: formData.category,
-                    onChange: function(e) { setFormData(Object.assign({}, formData, { category: e.target.value })); },
-                    className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white transition cursor-pointer text-sm disabled:bg-slate-100"
-                  },
-                    categories.map(function(c) { return h('option', { key: c, value: c }, c); })
-                  )
-                )
-              ),
-              h('div', null,
-                h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "作品摘要概述"),
-                h('textarea', {
-                  rows: "4",
-                  disabled: !isOpen,
-                  value: formData.summary,
-                  onChange: function(e) { setFormData(Object.assign({}, formData, { summary: e.target.value })); },
-                  className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition resize-none text-sm disabled:bg-slate-100",
-                  placeholder: "請描述作品的設計理念、解決問題及核心亮點功能..."
-                })
-              ),
-
-              // 實際檔案上傳機制 (限定 20MB)
-              h('div', { className: "border border-slate-200 rounded-2xl p-5 bg-slate-50/50 hover:bg-slate-50 transition" },
-                h('h4', { className: "text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5" },
-                  h('i', { className: "fa-solid fa-paperclip text-blue-500" }), "上傳參賽檔案 (上限 20MB)"
-                ),
-                h('div', { className: "relative border-2 border-dashed border-slate-200 rounded-xl p-6 text-center bg-white hover:border-blue-400 transition cursor-pointer" },
-                  h('input', {
-                    type: "file",
-                    disabled: !isOpen,
-                    onChange: handleFileChange,
-                    className: "absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                  }),
-                  h('i', { className: "fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2 block" }),
-                  h('p', { className: "text-xs sm:text-sm text-slate-600 font-medium" }, "點擊或拖曳檔案至此區域上傳"),
-                  h('p', { className: "text-[11px] text-slate-400 mt-1" }, "支援 JPG, PNG, PDF, ZIP, PPT 等各式檔案，限制最高 20MB")
-                ),
-                
-                // 💡 修正：選取檔案後僅顯示標準檔案卡片與對應類型圖示，不再於此處渲染縮圖！
-                file && h('div', { className: "mt-4 p-4 bg-white border border-slate-150 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm" },
-                  h('div', { className: "flex items-center gap-3.5" },
-                    h('div', { className: "h-12 w-12 rounded-lg flex items-center justify-center text-xl " + (
-                        file.type.startsWith('image/') ? 'bg-emerald-50 text-emerald-500' :
-                        file.type.includes('pdf') ? 'bg-rose-50 text-red-500' :
-                        file.type.includes('zip') ? 'bg-amber-50 text-amber-500' :
-                        'bg-blue-50 text-blue-500'
-                      )},
-                      h('i', { className: "fa-solid " + (
-                          file.type.startsWith('image/') ? 'fa-file-image' :
-                          file.type.includes('pdf') ? 'fa-file-pdf' :
-                          file.type.includes('zip') ? 'fa-file-zipper' :
-                          'fa-file-lines'
-                        )})
-                    ),
-                    h('div', { className: "text-left" },
-                      h('p', { className: "text-xs sm:text-sm font-bold text-slate-800" }, file.name),
-                      h('p', { className: "text-[11px] text-slate-400 mt-0.5" }, "檔案大小：" + formatBytes(file.size) + " • 類型：" + file.type)
-                    )
-                  ),
-                  h('button', {
-                    onClick: function() { setFile(null); },
-                    className: "text-slate-400 hover:text-rose-500 transition px-2 py-1"
-                  }, h('i', { className: "fa-regular fa-circle-xmark text-lg" }))
-                )
-              ),
-
-              h('div', { className: "flex justify-end space-x-3 pt-4 border-t border-slate-100" },
-                h('button', {
-                  type: "button",
-                  disabled: submitting || !isOpen,
-                  onClick: function() { handleSave(true); },
-                  className: "px-5 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-medium hover:bg-slate-50 transition active:scale-[0.98] disabled:opacity-50 text-sm"
-                }, "儲存為草稿"),
-                h('button', {
-                  type: "button",
-                  disabled: submitting || !isOpen,
-                  onClick: function() { handleSave(false); },
-                  className: "px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 transition active:scale-[0.98] disabled:opacity-50 text-sm"
-                }, submitting ? '縮圖壓縮並上傳中...' : '確認送出審查')
-              )
-            )
-          );
-        };
-
-        // ==========================================
-        // 教師評審端審核表單
-        // ==========================================
-        var TeacherReviewForm = function() {
-          var feedbackState = useState('');
-          var feedback = feedbackState[0];
-          var setFeedback = feedbackState[1];
-
-          var updateState = useState(false);
-          var updating = updateState[0];
-          var setUpdating = updateState[1];
-
-          if (!selectedProject) return null;
-
-          var handleUpdateStatus = async function(newStatus) {
-            setUpdating(true);
-
-            if (firebaseReady && db && !String(selectedProject.id).startsWith('local-')) {
-              try {
-                var collectionPath = 'artifacts/' + appId + '/public/data/projects';
-                await db.collection(collectionPath).doc(selectedProject.id).update({
-                  status: newStatus,
-                  teacherFeedback: feedback || '審查完成，無具體修改意見。'
-                });
-                triggerToast("作品審定決議已更新！狀態：" + MOCK_STATUSES[newStatus].label, "success");
-                setCurrentView('DASHBOARD');
-                setSelectedProject(null);
-              } catch (err) {
-                console.error(err);
-                triggerToast('寫入雲端失敗，請確認資料庫權限是否開啟。', "error");
-              } finally {
-                setUpdating(false);
-              }
-            } else {
-              // 本地模擬
-              var updated = projects.map(function(p) {
-                return p.id === selectedProject.id ? Object.assign({}, p, { status: newStatus, teacherFeedback: feedback }) : p;
-              });
-              updateProjectsDb(updated);
-              triggerToast("[模擬審查成功] 狀態改為：" + MOCK_STATUSES[newStatus].label, "success");
-              setCurrentView('DASHBOARD');
-              setSelectedProject(null);
-              setUpdating(false);
-            }
-          };
-
-          return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
-            h('div', { className: "lg:col-span-2 space-y-6" },
-              h('div', { className: "bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100" },
-                h('div', { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-6" },
-                  h('div', null,
-                    h('span', { className: "text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-bold" }, selectedProject.category),
-                    h('h2', { className: "text-xl sm:text-2xl font-bold text-slate-800 mt-2" }, selectedProject.title)
-                  ),
-                  h('span', { className: "px-3 py-1 rounded-full text-xs font-bold self-start sm:self-auto " + (MOCK_STATUSES[selectedProject.status]?.color || 'bg-slate-100 text-slate-700') },
-                    MOCK_STATUSES[selectedProject.status]?.label || selectedProject.status
-                  )
-                ),
-                h('div', { className: "grid grid-cols-2 gap-4 text-xs sm:text-sm text-slate-600 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100" },
-                  h('p', null, h('span', { className: "text-slate-400 mr-2" }, "參賽學生:"), selectedProject.student),
-                  h('p', null, h('span', { className: "text-slate-400 mr-2" }, "所屬單位:"), selectedProject.school),
-                  h('p', null, h('span', { className: "text-slate-400 mr-2" }, "指導老師:"), selectedProject.advisor || '無'),
-                  h('p', null, h('span', { className: "text-slate-400 mr-2" }, "上傳日期:"), selectedProject.date)
-                ),
-                h('div', { className: "mb-6" },
-                  h('h4', { className: "font-bold text-slate-800 mb-2" }, "作品摘要簡介"),
-                  h('p', { className: "text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-slate-100" },
-                    selectedProject.summary
-                  )
-                ),
-                
-                // 評審端縮圖與上傳紀錄預覽區 (評審可以看到縮圖方便評分)
-                h('div', { className: "p-4 bg-slate-50 border border-slate-150 rounded-xl" },
-                  h('h4', { className: "font-bold text-slate-800 mb-3 flex items-center gap-1.5" },
-                    h('i', { className: "fa-solid fa-file-shield text-blue-500" }), "作品附件與縮圖預覽"
-                  ),
-                  selectedProject.thumbnail ? h('div', { className: "space-y-3" },
-                    h('div', { className: "text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100 inline-block" },
-                      h('i', { className: "fa-solid fa-image mr-1" }), "安全雲端縮圖已自動生成"
-                    ),
-                    h('img', { 
-                      src: selectedProject.thumbnail, 
-                      className: "max-w-xs h-auto object-contain rounded-xl border border-slate-200 shadow-md hover:scale-105 transition duration-300 bg-white" 
-                    }),
-                    h('p', { className: "text-[11px] text-slate-400 font-mono" }, "上傳歷史紀錄時間：" + (selectedProject.uploadTime || '未知'))
-                  ) : h('div', { className: "p-3 bg-white border border-slate-100 rounded-lg flex items-center justify-between shadow-sm" },
-                    h('div', { className: "flex items-center gap-3 text-sm text-slate-700" },
-                      h('i', { className: "fa-solid fa-file-arrow-down text-blue-500 text-lg animate-bounce" }),
-                      h('div', { className: "text-left" },
-                        h('span', { className: "font-bold text-slate-800 block" }, selectedProject.fileName || "作品附檔"),
-                        h('span', { className: "text-[10px] text-slate-400 block font-mono" }, "上傳紀錄時間：" + (selectedProject.uploadTime || '未知'))
-                      )
-                    ),
-                    h('span', { className: "text-xs text-slate-400" }, "檔案大小：" + formatBytes(selectedProject.fileSize))
-                  )
-                )
-              )
-            ),
-            h('div', { className: "lg:col-span-1" },
-              h('div', { className: "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6" },
-                h('h3', { className: "text-base font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-1.5" },
-                  h('i', { className: "fa-solid fa-feather text-indigo-500" }), "評審審定意見"
-                ),
-                h('div', { className: "space-y-4" },
-                  h('div', null,
-                    h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "評審綜合意見與評語"),
-                    h('textarea', {
-                      rows: "4",
-                      value: feedback,
-                      onChange: function(e) { setFeedback(e.target.value); },
-                      className: "w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-xs transition resize-none",
-                      placeholder: "請填寫對該作品之具體修訂意見或評定評語..."
-                    })
-                  ),
-                  h('div', { className: "space-y-2 pt-2 border-t border-slate-100" },
-                    h('button', {
-                      disabled: updating,
-                      onClick: function() { handleUpdateStatus('APPROVED'); },
-                      className: "w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition flex items-center justify-center space-x-2 shadow-sm"
-                    }, h('i', { className: "fa-solid fa-circle-check" }), h('span', null, "通過此項審查")),
-                    h('button', {
-                      disabled: updating,
-                      onClick: function() { handleUpdateStatus('REVISION_REQUIRED'); },
-                      className: "w-full py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition flex items-center justify-center space-x-2 shadow-sm"
-                    }, h('i', { className: "fa-solid fa-triangle-exclamation" }), h('span', null, "通知學生補件")),
-                    h('button', {
-                      disabled: updating,
-                      onClick: function() { handleUpdateStatus('REJECTED'); },
-                      className: "w-full py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100 transition flex items-center justify-center space-x-2"
-                    }, h('i', { className: "fa-solid fa-circle-xmark" }), h('span', null, "退回不予通過"))
-                  ),
-                  h('button', {
-                    onClick: function() { setCurrentView('DASHBOARD'); setSelectedProject(null); },
-                    className: "w-full text-center text-xs text-slate-400 hover:text-slate-600 py-1 transition"
-                  }, "取消並返回列表")
-                )
-              )
-            )
-          );
-        };
-
-        // ==========================================
-        // 系統管理員：帳號密碼維護面板 (核心需求)
-        // ==========================================
-        var AdminUsersView = function() {
-          var newUserState = useState({ account: '', password: '', name: '', role: 'STUDENT', school: '' });
-          var newUser = newUserState[0];
-          var setNewUser = newUserState[1];
-          
-          var editingState = useState(false);
-
-          var handleSaveUser = async function() {
-            if (!newUser.account.trim() || !newUser.password.trim() || !newUser.name.trim()) {
-              triggerToast("請填寫完整的帳號、密碼與姓名！", "error");
-              return;
-            }
-
-            var duplicate = users.find(function(u) { return u.account === newUser.account && !editingState[0]; });
-            if (duplicate) {
-              triggerToast("此帳號已存在，不可重複建立！", "error");
-              return;
-            }
-
-            var updatedList = users.filter(function(u) { return u.account !== newUser.account; }).concat(newUser);
-            await updateUsersDb(updatedList);
-            
-            if (firebaseReady && db) {
-              var usersPath = 'artifacts/' + appId + '/public/data/users';
-              await db.collection(usersPath).doc(newUser.account).set(newUser);
-            }
-
-            triggerToast("帳號「" + newUser.name + "」儲存成功！", "success");
-            setNewUser({ account: '', password: '', name: '', role: 'STUDENT', school: '' });
-            editingState[1](false);
-          };
-
-          var handleDeleteUser = async function(account) {
-            if (account === 'admin') {
-              triggerToast("安全警示：預設管理員帳號不予刪除！", "error");
-              return;
-            }
-            if (confirm("確認要刪除此帳號嗎？相關之學生權限將會失效。")) {
-              var updatedList = users.filter(function(u) { return u.account !== account; });
-              await updateUsersDb(updatedList);
-              if (firebaseReady && db) {
-                var usersPath = 'artifacts/' + appId + '/public/data/users';
-                await db.collection(usersPath).doc(account).delete();
-              }
-              triggerToast("帳號已順利刪除。", "success");
-            }
-          };
-
-          return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
-            h('div', { className: "lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100" },
-              h('h3', { className: "text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5" },
-                h('i', { className: "fa-solid fa-users text-blue-500" }), "現有使用者帳號清冊"
-              ),
-              h('div', { className: "overflow-x-auto" },
-                h('table', { className: "w-full text-sm text-left text-slate-600" },
-                  h('thead', { className: "bg-slate-50 text-slate-500 font-semibold border-b border-slate-100" },
-                    h('tr', null,
-                      h('th', { className: "py-3 px-4" }, "姓名"),
-                      h('th', { className: "py-3 px-4" }, "帳號"),
-                      h('th', { className: "py-3 px-4" }, "密碼"),
-                      h('th', { className: "py-3 px-4" }, "單位/班級"),
-                      h('th', { className: "py-3 px-4" }, "系統權限"),
-                      h('th', { className: "py-3 px-4 text-right" }, "維護操作")
-                    )
-                  ),
-                  h('tbody', { className: "divide-y divide-slate-100" },
-                    users.map(function(u) {
-                      return h('tr', { key: u.account, className: "hover:bg-slate-50/50" },
-                        h('td', { className: "py-3 px-4 font-bold text-slate-800" }, u.name),
-                        h('td', { className: "py-3 px-4 text-xs font-mono" }, u.account),
-                        h('td', { className: "py-3 px-4 text-xs font-mono text-slate-400" }, u.password),
-                        h('td', { className: "py-3 px-4 text-xs" }, u.school || '無'),
-                        h('td', { className: "py-3 px-4" }, 
-                          h('span', { className: "px-2 py-0.5 rounded text-[10px] font-bold " + (
-                            u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
-                            u.role === 'TEACHER' ? 'bg-indigo-100 text-indigo-700' :
-                            'bg-blue-100 text-blue-700'
-                          )}, u.role)
-                        ),
-                        h('td', { className: "py-3 px-4 text-right space-x-2" },
-                          h('button', {
-                            onClick: function() { setNewUser(u); editingState[1](true); },
-                            className: "text-blue-600 hover:text-blue-800 text-xs font-bold"
-                          }, "編輯"),
-                          h('button', {
-                            onClick: function() { handleDeleteUser(u.account); },
-                            className: "text-rose-500 hover:text-rose-700 text-xs font-bold"
-                          }, "刪除")
-                        )
-                      );
-                    })
-                  )
-                )
-              )
-            ),
-            h('div', { className: "lg:col-span-1" },
-              h('div', { className: "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6" },
-                h('h3', { className: "text-base font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-1.5" },
-                  h('i', { className: "fa-solid " + (editingState[0] ? 'fa-user-pen text-amber-500' : 'fa-user-plus text-blue-500') }),
-                  editingState[0] ? "修改使用者帳號" : "新增使用者帳號"
-                ),
-                h('div', { className: "space-y-4" },
-                  h('div', null,
-                    h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "姓名"),
-                    h('input', {
-                      type: "text",
-                      value: newUser.name,
-                      onChange: function(e) { setNewUser(Object.assign({}, newUser, { name: e.target.value })); },
-                      className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none",
-                      placeholder: "請輸入姓名"
-                    })
-                  ),
-                  h('div', null,
-                    h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "登入帳號 (Account)"),
-                    h('input', {
-                      type: "text",
-                      disabled: editingState[0],
-                      value: newUser.account,
-                      onChange: function(e) { setNewUser(Object.assign({}, newUser, { account: e.target.value })); },
-                      className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none disabled:bg-slate-100 disabled:text-slate-400 font-mono",
-                      placeholder: "請輸入帳號"
-                    })
-                  ),
-                  h('div', null,
-                    h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "密碼 (Password)"),
-                    h('input', {
-                      type: "text",
-                      value: newUser.password,
-                      onChange: function(e) { setNewUser(Object.assign({}, newUser, { password: e.target.value })); },
-                      className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none font-mono",
-                      placeholder: "請輸入登入密碼"
-                    })
-                  ),
-                  h('div', null,
-                    h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "系統角色"),
-                    h('select', {
-                      value: newUser.role,
-                      onChange: function(e) { setNewUser(Object.assign({}, newUser, { role: e.target.value })); },
-                      className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none bg-white cursor-pointer"
-                    },
-                      h('option', { value: "STUDENT" }, "學生 (投稿者)"),
-                      h('option', { value: "TEACHER" }, "教師 (評審者)"),
-                      h('option', { value: "ADMIN" }, "管理者")
-                    )
-                  ),
-                  h('div', null,
-                    h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "班級 / 所屬單位"),
-                    h('input', {
-                      type: "text",
-                      value: newUser.school,
-                      onChange: function(e) { setNewUser(Object.assign({}, newUser, { school: e.target.value })); },
-                      className: "w-full p-2.5 border border-slate-200 rounded-lg text-xs outline-none",
-                      placeholder: "例如：資工三甲"
-                    })
-                  ),
-                  h('div', { className: "pt-4 flex gap-2" },
-                    editingState[0] && h('button', {
-                      onClick: function() { 
-                        setNewUser({ account: '', password: '', name: '', role: 'STUDENT', school: '' }); 
-                        editingState[1](false); 
-                      },
-                      className: "flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition"
-                    }, "取消編輯"),
-                    h('button', {
-                      onClick: handleSaveUser,
-                      className: "flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-md shadow-blue-500/10"
-                    }, "儲存設定")
-                  )
-                )
-              )
-            )
-          );
-        };
-
-        // ==========================================
-        // 系統管理員：競賽類別管理
-        // ==========================================
-        var AdminCategoriesView = function() {
-          var newCatState = useState('');
-
-          var handleAddCat = function() {
-            var val = newCatState[0].trim();
-            if (!val) return;
-            if (categories.indexOf(val) !== -1) {
-              triggerToast("此競賽組別已存在！", "error");
-              return;
-            }
-            var updated = categories.concat(val);
-            updateSettingsDb(systemSettings, updated);
-            triggerToast("競賽類別「" + val + "」新增成功！", "success");
-            newCatState[1]('');
-          };
-
-          var handleDeleteCat = function(c) {
-            if (confirm("確認要刪除「" + c + "」組別類別嗎？")) {
-              var updated = categories.filter(function(cat) { return cat !== c; });
-              updateSettingsDb(systemSettings, updated);
-              triggerToast("類別已成功移除。", "success");
-            }
-          };
-
-          return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
-            h('div', { className: "lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100" },
-              h('h3', { className: "text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5" },
-                h('i', { className: "fa-solid fa-tags text-blue-500" }), "當前開放競賽組別清單"
-              ),
-              h('div', { className: "space-y-2.5" },
-                categories.map(function(c) {
-                  return h('div', { key: c, className: "flex justify-between items-center p-3.5 bg-slate-50 border border-slate-150 rounded-xl" },
-                    h('span', { className: "font-bold text-slate-700 text-sm" }, c),
-                    h('button', {
-                      onClick: function() { handleDeleteCat(c); },
-                      className: "text-rose-500 hover:text-rose-700 text-xs font-bold"
-                    }, h('i', { className: "fa-regular fa-trash-can text-base" }))
-                  );
-                })
-              )
-            ),
-            h('div', { className: "lg:col-span-1" },
-              h('div', { className: "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6" },
-                h('h3', { className: "text-base font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-1.5" },
-                  h('i', { className: "fa-solid fa-plus text-blue-500" }), "追加新增競賽類別"
-                ),
-                h('div', { className: "space-y-4" },
-                  h('div', null,
-                    h('label', { className: "block text-xs font-bold text-slate-500 mb-1.5" }, "類別名稱 (如：IOT智慧聯網組)"),
-                    h('input', {
-                      type: "text",
-                      value: newCatState[0],
-                      onChange: function(e) { newCatState[1](e.target.value); },
-                      className: "w-full p-3 border border-slate-200 rounded-xl text-xs outline-none",
-                      placeholder: "請輸入組別名稱"
-                    })
-                  ),
-                  h('button', {
-                    onClick: handleAddCat,
-                    className: "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-blue-500/10"
-                  }, "新增組別")
-                )
-              )
-            )
-          );
-        };
-
-        // ==========================================
-        // 系統管理員：開放時間設定
-        // ==========================================
-        var AdminSettingsView = function() {
-          var startState = useState(systemSettings.submissionStart);
-          var endState = useState(systemSettings.submissionEnd);
-
-          var handleSaveSettings = function() {
-            var s = startState[0];
-            var e = endState[0];
-            if (!s || !e) {
-              triggerToast("開放起訖日期不可為空！", "error");
-              return;
-            }
-            if (s > e) {
-              triggerToast("截止日期不得早於開始日期！", "error");
-              return;
-            }
-            updateSettingsDb({ submissionStart: s, submissionEnd: e }, categories);
-            triggerToast("投稿開放時段更新儲存成功！", "success");
-          };
-
-          return h('div', { className: "max-w-xl bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100 text-left animate-fade-in" },
-            h('h3', { className: "text-base font-bold text-slate-800 mb-6 border-b pb-3 flex items-center gap-1.5" },
-              h('i', { className: "fa-solid fa-calendar-days text-blue-500" }), "設定學生開放投稿時限"
-            ),
-            h('div', { className: "space-y-6" },
-              h('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-6" },
-                h('div', null,
-                  h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "開始投稿日期"),
-                  h('input', {
-                    type: "date",
-                    value: startState[0],
-                    onChange: function(e) { startState[1](e.target.value); },
-                    className: "w-full p-3 border border-slate-200 rounded-xl text-sm outline-none"
-                  })
-                ),
-                h('div', null,
-                  h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "截止投稿日期"),
-                  h('input', {
-                    type: "date",
-                    value: endState[0],
-                    onChange: function(e) { endState[1](e.target.value); },
-                    className: "w-full p-3 border border-slate-200 rounded-xl text-sm outline-none"
-                  })
-                )
-              ),
-              h('button', {
-                onClick: handleSaveSettings,
-                className: "px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition active:scale-[0.98] shadow-md shadow-blue-500/10"
-              }, "確認儲存設定")
-            )
-          );
-        };
-
-        // ==========================================
-        // 通用：列表主總覽 (Dashboard)
-        // ==========================================
-        var DashboardList = function() {
-          var displayProjects = currentUser.role === 'STUDENT'
-            ? projects.filter(function(p) { return p.studentId === currentUser.account; })
-            : projects;
-
-          var handleDeleteProject = async function(id) {
-            if (confirm("您確認要撤回並刪除這項投稿作品嗎？此操作無法還原。")) {
-              if (firebaseReady && db && !String(id).startsWith('local-')) {
-                try {
-                  var collectionPath = 'artifacts/' + appId + '/public/data/projects';
-                  await db.collection(collectionPath).doc(id).delete();
-                  triggerToast("作品撤回成功！", "success");
-                } catch (e) {
-                  triggerToast("撤回失敗", "error");
-                }
-              } else {
-                var updated = projects.filter(function(p) { return p.id !== id; });
-                updateProjectsDb(updated);
-                triggerToast("作品已從本地端成功移除。", "success");
-              }
-            }
-          };
-
-          return h('div', { className: "space-y-6 text-left animate-fade-in" },
-            currentUser.role !== 'STUDENT' && h('div', { className: "grid grid-cols-2 lg:grid-cols-4 gap-4" },
-              h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
-                h('div', { className: "p-2.5 bg-blue-50 text-blue-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-file-invoice w-5 text-center" })),
-                h('div', null,
-                  h('p', { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider" }, "總收件件數"),
-                  h('p', { className: "text-lg font-black text-slate-800" }, projects.length)
-                )
-              ),
-              h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
-                h('div', { className: "p-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-badge-check w-5 text-center" })),
-                h('div', null,
-                  h('p', { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider" }, "審查通過件數"),
-                  h('p', { className: "text-lg font-black text-slate-800" }, projects.filter(function(p) { return p.status === 'APPROVED'; }).length)
-                )
-              ),
-              h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
-                h('div', { className: "p-2.5 bg-amber-50 text-amber-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-spinner w-5 text-center animate-spin" })),
-                h('div', null,
-                  h('p', { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider" }, "待審理件數"),
-                  h('p', { className: "text-lg font-black text-slate-800" }, projects.filter(function(p) { return p.status === 'SUBMITTED' || p.status === 'REVIEWING'; }).length)
-                )
-              ),
-              h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
-                h('div', { className: "p-2.5 bg-rose-50 text-rose-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-users w-5 text-center" })),
-                h('div', null,
-                  h('p', { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider" }, "系統總帳號數"),
-                  h('p', { className: "text-lg font-black text-slate-800" }, users.length)
-                )
-              )
-            ),
-            h('div', { className: "bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" },
-              h('div', { className: "p-4.5 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4" },
-                h('div', { className: "w-full sm:flex-1 relative" },
-                  h('i', { className: "fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 text-xs" }),
-                  h('input', {
-                    type: "text",
-                    placeholder: "搜尋參賽作品項目、類別或學生姓名...",
-                    className: "w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition bg-white"
-                  })
-                )
-              ),
-              h('div', { className: "overflow-x-auto" },
-                h('table', { className: "w-full text-left text-xs sm:text-sm whitespace-nowrap" },
-                  h('thead', { className: "bg-slate-50 text-slate-500 font-bold border-b border-slate-100" },
-                    h('tr', null,
-                      h('th', { className: "py-3 px-6" }, "作品名稱 / 附檔中繼"),
-                      h('th', { className: "py-3 px-6" }, "組別"),
-                      h('th', { className: "py-3 px-6" }, currentUser.role === 'STUDENT' ? '上傳歷史日期' : '投稿學生資訊'),
-                      h('th', { className: "py-3 px-6 text-center" }, "狀態"),
-                      h('th', { className: "py-3 px-6 text-right" }, "操作項目")
-                    )
-                  ),
-                  h('tbody', { className: "divide-y divide-slate-100" },
-                    displayProjects.length === 0 ? h('tr', null,
-                      h('td', { colSpan: "5", className: "py-10 text-center text-slate-400 font-bold" },
-                        h('i', { className: "fa-solid fa-inbox text-3xl mb-2.5 block" }),
-                        "目前尚無投稿作品紀錄。"
-                      )
-                    ) : displayProjects.map(function(project) {
-                      return h('tr', { key: project.id, className: "hover:bg-slate-50/30 transition" },
-                        h('td', { className: "py-4 px-6 font-semibold text-slate-800" },
-                          h('div', { className: "flex items-center gap-3.5" },
-                            project.thumbnail ? h('img', { src: project.thumbnail, className: "h-9 w-9 object-cover rounded-lg border shadow-sm bg-white" })
-                            : h('div', { className: "h-9 w-9 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500 text-sm" },
-                                h('i', { className: "fa-solid " + (project.fileType && project.fileType.includes('pdf') ? 'fa-file-pdf text-red-500' : 'fa-file-lines') })
-                              ),
-                            h('div', { className: "max-w-xs sm:max-w-md" },
-                              h('p', { className: "truncate text-slate-800 font-bold" }, project.title),
-                              h('p', { className: "text-[10px] text-slate-400 font-mono mt-0.5" }, (project.fileName || '無附檔') + " (" + formatBytes(project.fileSize) + ")")
-                            )
-                          )
-                        ),
-                        h('td', { className: "py-4 px-6 text-slate-500 font-medium text-xs" }, project.category),
-                        h('td', { className: "py-4 px-6 text-slate-500" },
-                          currentUser.role === 'STUDENT' ? h('div', null,
-                            h('p', { className: "font-semibold text-slate-700" }, project.date),
-                            h('p', { className: "text-[10px] text-slate-400 font-mono" }, "上傳時間：" + (project.uploadTime || '未知'))
-                          ) : h('div', null,
-                            h('p', { className: "font-bold text-slate-700" }, project.student),
-                            h('p', { className: "text-[10px] text-slate-400 font-mono" }, project.school + " • " + (project.uploadTime || '未知'))
-                          )
-                        ),
-                        h('td', { className: "py-4 px-6 text-center" },
-                          h('span', { className: "px-3 py-1 rounded-full text-[10px] font-bold inline-block shadow-sm " + (MOCK_STATUSES[project.status]?.color || 'bg-slate-100 text-slate-700') },
-                            MOCK_STATUSES[project.status]?.label || project.status
-                          )
-                        ),
-                        h('td', { className: "py-4 px-6 text-right text-xs" },
-                          currentUser.role === 'TEACHER' ? h('button', {
-                            onClick: function() { setSelectedProject(project); setCurrentView('REVIEW_FORM'); },
-                            className: "bg-blue-50 text-blue-600 font-bold px-3.5 py-2 rounded-xl hover:bg-blue-100 active:scale-95 transition mr-2"
-                          },
-                            h('i', { className: "fa-solid fa-magnifying-glass mr-1" }), "審查評估"
-                          ) : h('div', { className: "space-x-2" },
-                            h('button', {
-                              onClick: function() { 
-                                var feedbackMsg = project.teacherFeedback ? "\n評審建議意見：\n" + project.teacherFeedback : "\n評審尚未填寫修改意見。";
-                                alert("【作品項目名稱】\n" + project.title + "\n\n組別：" + project.category + "\n狀態：" + MOCK_STATUSES[project.status]?.label + "\n指導老師：" + project.advisor + "\n" + feedbackMsg); 
-                              },
-                              className: "text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 transition"
-                            }, "詳情"),
-                            currentUser.role === 'STUDENT' && h('button', {
-                              onClick: function() { handleDeleteProject(project.id); },
-                              className: "text-rose-500 hover:text-rose-700 font-bold px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 transition"
-                            }, "撤回")
-                          )
-                        )
-                      );
-                    })
-                  )
-                )
-              )
-            )
-          );
-        };
-
-        // 頁面主體渲染路由
+        // 頁面主體渲染路由 (將 state 以及 handlers 作為 props 傳入獨立元件，保障狀態永不丟失！)
         var renderMainContent = function() {
-          if (currentView === 'LOGIN') return h(LoginView);
+          if (currentView === 'LOGIN') {
+            return h(LoginView, { users: users, handleLogin: handleLogin });
+          }
           
           var activeComponent = null;
-          if (currentView === 'DASHBOARD') activeComponent = h(DashboardList);
-          if (currentView === 'SUBMIT_FORM') activeComponent = h(StudentSubmitForm);
-          if (currentView === 'REVIEW_FORM') activeComponent = h(TeacherReviewForm);
-          if (currentView === 'ADMIN_USERS') activeComponent = h(AdminUsersView);
-          if (currentView === 'ADMIN_CATEGORIES') activeComponent = h(AdminCategoriesView);
-          if (currentView === 'ADMIN_SETTINGS') activeComponent = h(AdminSettingsView);
+          
+          if (currentView === 'DASHBOARD') {
+            activeComponent = h(DashboardList, {
+              currentUser: currentUser,
+              projects: projects,
+              users: users,
+              firebaseReady: firebaseReady,
+              db: db,
+              appId: appId,
+              updateProjectsDb: updateProjectsDb,
+              setCurrentView: setCurrentView,
+              setSelectedProject: setSelectedProject,
+              triggerToast: triggerToast,
+              formatBytes: formatBytes,
+              MOCK_STATUSES: MOCK_STATUSES
+            });
+          }
+          
+          if (currentView === 'SUBMIT_FORM') {
+            activeComponent = h(StudentSubmitForm, {
+              categories: categories,
+              systemSettings: systemSettings,
+              currentUser: currentUser,
+              firebaseReady: firebaseReady,
+              db: db,
+              appId: appId,
+              projects: projects,
+              updateProjectsDb: updateProjectsDb,
+              setCurrentView: setCurrentView,
+              triggerToast: triggerToast,
+              formatBytes: formatBytes,
+              checkSubmissionOpen: checkSubmissionOpen
+            });
+          }
+          
+          if (currentView === 'REVIEW_FORM') {
+            activeComponent = h(TeacherReviewForm, {
+              selectedProject: selectedProject,
+              firebaseReady: firebaseReady,
+              db: db,
+              appId: appId,
+              projects: projects,
+              updateProjectsDb: updateProjectsDb,
+              setCurrentView: setCurrentView,
+              setSelectedProject: setSelectedProject,
+              triggerToast: triggerToast,
+              formatBytes: formatBytes,
+              MOCK_STATUSES: MOCK_STATUSES
+            });
+          }
+          
+          if (currentView === 'ADMIN_USERS') {
+            activeComponent = h(AdminUsersView, {
+              users: users,
+              updateUsersDb: updateUsersDb,
+              firebaseReady: firebaseReady,
+              db: db,
+              appId: appId,
+              triggerToast: triggerToast
+            });
+          }
+          
+          if (currentView === 'ADMIN_CATEGORIES') {
+            activeComponent = h(AdminCategoriesView, {
+              categories: categories,
+              systemSettings: systemSettings,
+              updateSettingsDb: updateSettingsDb,
+              triggerToast: triggerToast
+            });
+          }
+          
+          if (currentView === 'ADMIN_SETTINGS') {
+            activeComponent = h(AdminSettingsView, {
+              systemSettings: systemSettings,
+              categories: categories,
+              updateSettingsDb: updateSettingsDb,
+              triggerToast: triggerToast
+            });
+          }
 
-          return h(Layout, null, activeComponent);
+          return h(Layout, {
+            currentUser: currentUser,
+            currentView: currentView,
+            setCurrentView: setCurrentView,
+            setSelectedProject: setSelectedProject,
+            systemSettings: systemSettings,
+            handleLogout: handleLogout,
+            toast: toast,
+            setToast: setToast,
+            statusBanner: statusBanner,
+            triggerToast: triggerToast
+          }, activeComponent);
         };
 
         return renderMainContent();
       }
 
-      // 直接使用 React 渲染至 root，不經過任何 Babel 即時編譯器！
       var root = ReactDOM.createRoot(document.getElementById('root'));
       root.render(h(App));
     })();
