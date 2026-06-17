@@ -14,685 +14,643 @@
   <!-- 載入 React 與 ReactDOM (生產環境穩定 UMD 版本) -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  
-  <!-- 載入 Babel 用於即時解析 JSX -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <!-- Firebase Compat CDN (最高階跨網域相容性) -->
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
-
-  <!-- 💡 智慧型 JavaScript 錯誤捕獲診斷器：只捕捉並回報與本專案直接相關的致命錯誤，避免外部腳本與擴充功能干擾 -->
-  <script>
-    window.addEventListener('error', function(e) {
-      // 忽略來自外部 CDN、瀏覽器擴充功能 (chrome-extension) 或不相關來源的錯誤
-      if (e.filename && 
-          !e.filename.includes('index.html') && 
-          !e.filename.includes('bestolo-class-online') && 
-          e.filename !== '') {
-        console.warn("已忽略無關的外部腳本錯誤:", e.message, "來源:", e.filename);
-        return; 
-      }
-
-      var root = document.getElementById('root');
-      if (root) {
-        root.innerHTML = `
-          <div style="padding: 24px; background: #fff1f2; color: #9f1239; font-family: system-ui, sans-serif; border-radius: 12px; margin: 40px auto; max-width: 600px; border: 1px solid #fecdd3; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: left;">
-            <h3 style="margin-top: 0; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-              <i class="fa-solid fa-triangle-exclamation" style="color: #e11d48;"></i> 系統初始化失敗
-            </h3>
-            <p style="font-size: 14px; margin: 12px 0; font-weight: 500;">錯誤原因: ${e.message}</p>
-            <p style="font-size: 12px; color: #be123c; background: #ffe4e6; padding: 8px; border-radius: 6px; font-family: monospace;">檔案來源: ${e.filename || '行內腳本'} (第 ${e.lineno || '未知'} 行)</p>
-            <p style="font-size: 13px; color: #4c0519; margin-top: 10px; line-height: 1.6;">
-              ※ <strong>請特別注意</strong>：若錯誤來源指向非本網域之檔案，通常為瀏覽器外掛或防毒軟體相衝突，請嘗試使用<strong>無痕視窗</strong>重新開啟此頁面。
-            </p>
-          </div>
-        `;
-      }
-    });
-  </script>
 </head>
 <body class="bg-slate-50 min-h-screen">
   
-  <!-- 根掛載節點與美化版骨架屏 (Skeleton Loading) -->
+  <!-- 根掛載節點 -->
   <div id="root">
     <div class="flex flex-col justify-center items-center h-screen bg-slate-50 p-6 text-center">
       <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-      <h3 class="text-lg font-bold text-slate-800 mb-1">投稿系統載入中...</h3>
-      <p class="text-xs text-slate-500 max-w-sm leading-relaxed">正在嘗試安全連線雲端資料庫。若長時間未有反應，請確認您的網路連線或前往主控台查看錯誤訊息。</p>
+      <h3 class="text-lg font-bold text-slate-800 mb-1">投稿系統安全載入中...</h3>
+      <p class="text-xs text-slate-500 max-w-sm leading-relaxed">正在安全初始化並載入雲端配置，請稍候。</p>
     </div>
   </div>
 
-  <!-- 💡 加上 data-presets 屬性，強制 Babel 使用安全穩定的相容模式編譯 React JSX 代碼 -->
-  <script type="text/babel" data-presets="env,react">
-    const { useState, useEffect } = React;
+  <!-- 使用 100% 瀏覽器原生相容的 JavaScript，完全不經過 Babel 轉譯，徹底解決 Cannot use import 衝突！ -->
+  <script>
+    (function() {
+      var useState = React.useState;
+      var useEffect = React.useEffect;
 
-    // ==========================================
-    // ⚠️ 您的 Firebase Config 設定 ⚠️
-    // ==========================================
-    const myFirebaseConfig = {
-      apiKey: "AIzaSyDCx4EegIg4bvxVbGTgTBUrCczcHibTbSw",
-      authDomain: "hsescompetitive.firebaseapp.com",
-      projectId: "hsescompetitive",
-      storageBucket: "hsescompetitive.firebasestorage.app",
-      messagingSenderId: "828617923145",
-      appId: "1:828617923145:web:3491fa6d814e0bdfe5bd98"
-    };
+      // 定義一個 React.createElement 的捷徑函數，讓代碼更精簡美觀
+      var h = React.createElement;
 
-    const isFirebaseConfigured = myFirebaseConfig.apiKey && myFirebaseConfig.apiKey !== "YOUR_API_KEY";
-
-    let app = null;
-    let auth = null;
-    let db = null;
-    let firebaseReady = false;
-
-    try {
-      if (isFirebaseConfigured && typeof firebase !== 'undefined') {
-        app = firebase.initializeApp(myFirebaseConfig);
-        auth = firebase.auth();
-        db = firebase.firestore();
-        firebaseReady = true;
-      }
-    } catch (e) {
-      console.warn("Firebase 初始化失敗：", e);
-    }
-
-    const appId = typeof __app_id !== 'undefined' ? __app_id : (myFirebaseConfig.projectId || 'hsescompetitive');
-
-    const MOCK_CATEGORIES = ['軟體開發組', '多媒體動畫組', '資訊安全組', '大數據分析組'];
-    const MOCK_STATUSES = {
-      DRAFT: { label: '草稿', color: 'bg-gray-100 text-gray-800' },
-      SUBMITTED: { label: '已送出 / 待審核', color: 'bg-blue-100 text-blue-800' },
-      REVIEWING: { label: '審核中', color: 'bg-yellow-100 text-yellow-800' },
-      REVISION_REQUIRED: { label: '需補件', color: 'bg-orange-100 text-orange-800' },
-      APPROVED: { label: '通過', color: 'bg-green-100 text-green-800' },
-      REJECTED: { label: '未通過', color: 'bg-red-100 text-red-800' }
-    };
-
-    const INITIAL_PROJECTS = [
-      { id: 'mock-1', title: 'AI校園導覽機器人', category: '軟體開發組', student: '王小明', school: '國立資訊大學', date: '2023-10-25', status: 'APPROVED', summary: '整合大型語言模型與語音辨識技術，開發校園智慧導覽軟體系統。' },
-      { id: 'mock-2', title: '基於區塊鏈的投票系統', category: '資訊安全組', student: '李大華', school: '市立科技大學', date: '2023-10-26', status: 'SUBMITTED', summary: '利用去中心化帳本技術，提供透明、防篡改的校園自治投票機制。' },
-      { id: 'mock-3', title: '智慧農場物聯網平台', category: '軟體開發組', student: '林阿慧', school: '國立農業大學', date: '2023-10-27', status: 'REVISION_REQUIRED', summary: '採用多種感測器回傳環境數據，進行即時灌溉與光照自動化控制。' },
-      { id: 'mock-4', title: '校園生活 3D 動畫', category: '多媒體動畫組', student: '陳美美', school: '藝術設計學院', date: '2023-10-28', status: 'REVIEWING', summary: '以幽默風趣的三維空間建模動畫，呈現現代學子生動活潑的校園日常。' }
-    ];
-
-    function App() {
-      const [user, setUser] = useState(null);
-      const [role, setRole] = useState('STUDENT');
-      const [projects, setProjects] = useState(INITIAL_PROJECTS);
-      const [currentView, setCurrentView] = useState('DASHBOARD');
-      const [selectedProject, setSelectedProject] = useState(null);
-      const [statusBanner, setStatusBanner] = useState({ type: 'info', text: '系統加載中...' });
-      const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
-
-      const triggerToast = (message, type = 'info') => {
-        setToast({ show: true, message, type });
-        setTimeout(() => setToast(prev => ({ ...prev, show: false })), 4000);
+      // ==========================================
+      // ⚠️ 您的 Firebase Config 設定 ⚠️
+      // ==========================================
+      var myFirebaseConfig = {
+        apiKey: "AIzaSyDCx4EegIg4bvxVbGTgTBUrCczcHibTbSw",
+        authDomain: "hsescompetitive.firebaseapp.com",
+        projectId: "hsescompetitive",
+        storageBucket: "hsescompetitive.firebasestorage.app",
+        messagingSenderId: "828617923145",
+        appId: "1:828617923145:web:3491fa6d814e0bdfe5bd98"
       };
 
-      useEffect(() => {
-        if (!firebaseReady || !auth) {
-          setStatusBanner({ 
-            type: 'warning', 
-            text: '💡 目前處於「預覽模式」（未連結 Firebase）。若已設定，請確認 Firebase 匿名登入已開啟。' 
-          });
-          return;
-        }
+      var isFirebaseConfigured = myFirebaseConfig.apiKey && myFirebaseConfig.apiKey !== "YOUR_API_KEY";
 
-        const runAuth = async () => {
-          try {
-            await auth.signInAnonymously();
-            setStatusBanner({ type: 'success', text: '⚡ 已成功連線雲端資料庫！資料將進行即時同步。' });
-          } catch (error) {
-            console.error('Firebase 登入失敗:', error);
-            setStatusBanner({ 
-              type: 'warning', 
-              text: '⚠️ Firebase 已連接但登入被拒。請至 Firebase Console 啟用「匿名登入 (Anonymous)」。' 
-            });
-          }
+      var app = null;
+      var auth = null;
+      var db = null;
+      var firebaseReady = false;
+
+      try {
+        if (isFirebaseConfigured && typeof firebase !== 'undefined') {
+          app = firebase.initializeApp(myFirebaseConfig);
+          auth = firebase.auth();
+          db = firebase.firestore();
+          firebaseReady = true;
+        }
+      } catch (e) {
+        console.warn("Firebase 初始化失敗：", e);
+      }
+
+      var appId = 'hsescompetitive';
+
+      var MOCK_CATEGORIES = ['軟體開發組', '多媒體動畫組', '資訊安全組', '大數據分析組'];
+      var MOCK_STATUSES = {
+        DRAFT: { label: '草稿', color: 'bg-gray-100 text-gray-800' },
+        SUBMITTED: { label: '已送出 / 待審核', color: 'bg-blue-100 text-blue-800' },
+        REVIEWING: { label: '審核中', color: 'bg-yellow-100 text-yellow-800' },
+        REVISION_REQUIRED: { label: '需補件', color: 'bg-orange-100 text-orange-800' },
+        APPROVED: { label: '通過', color: 'bg-green-100 text-green-800' },
+        REJECTED: { label: '未通過', color: 'bg-red-100 text-red-800' }
+      };
+
+      var INITIAL_PROJECTS = [
+        { id: 'mock-1', title: 'AI校園導覽機器人', category: '軟體開發組', student: '王小明', school: '國立資訊大學', date: '2023-10-25', status: 'APPROVED', summary: '整合大型語言模型與語音辨識技術，開發校園智慧導覽軟體系統。' },
+        { id: 'mock-2', title: '基於區塊鏈的投票系統', category: '資訊安全組', student: '李大華', school: '市立科技大學', date: '2023-10-26', status: 'SUBMITTED', summary: '利用去中心化帳本技術，提供透明、防篡改的校園自治投票機制。' },
+        { id: 'mock-3', title: '智慧農場物聯網平台', category: '軟體開發組', student: '林阿慧', school: '國立農業大學', date: '2023-10-27', status: 'REVISION_REQUIRED', summary: '採用多種感測器回傳環境數據，進行即時灌溉與光照自動化控制。' },
+        { id: 'mock-4', title: '校園生活 3D 動畫', category: '多媒體動畫組', student: '陳美美', school: '藝術設計學院', date: '2023-10-28', status: 'REVIEWING', summary: '以幽默風趣的三維空間建模動畫，呈現現代學子生動活潑的校園日常。' }
+      ];
+
+      function App() {
+        var userState = useState(null);
+        var user = userState[0];
+        var setUser = userState[1];
+
+        var roleState = useState('STUDENT');
+        var role = roleState[0];
+        var setRole = roleState[1];
+
+        var projectsState = useState(INITIAL_PROJECTS);
+        var projects = projectsState[0];
+        var setProjects = projectsState[1];
+
+        var currentViewState = useState('DASHBOARD');
+        var currentView = currentViewState[0];
+        var setCurrentView = currentViewState[1];
+
+        var selectedProjectState = useState(null);
+        var selectedProject = selectedProjectState[0];
+        var setSelectedProject = selectedProjectState[1];
+
+        var statusBannerState = useState({ type: 'info', text: '系統加載中...' });
+        var statusBanner = statusBannerState[0];
+        var setStatusBanner = statusBannerState[1];
+
+        var toastState = useState({ show: false, message: '', type: 'info' });
+        var toast = toastState[0];
+        var setToast = toastState[1];
+
+        var triggerToast = function(message, type) {
+          if (!type) type = 'info';
+          setToast({ show: true, message: message, type: type });
+          setTimeout(function() {
+            setToast(function(prev) { return Object.assign({}, prev, { show: false }); });
+          }, 4000);
         };
 
-        runAuth();
-        const unsubscribe = auth.onAuthStateChanged((u) => {
-          if (u) setUser(u);
-        });
-        return () => unsubscribe();
-      }, []);
+        useEffect(function() {
+          if (!firebaseReady || !auth) {
+            setStatusBanner({ 
+              type: 'warning', 
+              text: '💡 目前處於「本機安全預覽模式」。若已設定，請確認 Firebase 匿名登入已開啟。' 
+            });
+            return;
+          }
 
-      useEffect(() => {
-        if (!firebaseReady || !db || !user) {
-          setProjects(INITIAL_PROJECTS);
-          return;
-        }
-
-        try {
-          const collectionPath = `artifacts/${appId}/public/data/projects`;
-          const unsubscribe = db.collection(collectionPath).onSnapshot(
-            (snapshot) => {
-              if (snapshot.empty) {
-                setProjects(INITIAL_PROJECTS);
-              } else {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setProjects(data);
-              }
-            }, 
-            (error) => {
-              console.error('Firestore 訂閱失敗:', error);
+          var runAuth = async function() {
+            try {
+              await auth.signInAnonymously();
+              setStatusBanner({ type: 'success', text: '⚡ 已成功連線雲端資料庫！資料將進行即時同步。' });
+            } catch (error) {
+              console.error('Firebase 登入失敗:', error);
               setStatusBanner({ 
                 type: 'warning', 
-                text: '🔒 Firebase Firestore 阻擋了資料讀取。請至 Rules 修改安全性規則為允許讀寫。' 
+                text: '⚠️ Firebase 已連接但登入被拒。請至 Firebase Console 啟用「匿名登入 (Anonymous)」。' 
               });
-              setProjects(INITIAL_PROJECTS);
             }
-          );
-          return () => unsubscribe();
-        } catch (err) {
-          console.error('Firestore 初始化失敗:', err);
-          setProjects(INITIAL_PROJECTS);
-        }
-      }, [user]);
+          };
 
-      const Layout = ({ children }) => (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans antialiased relative">
-          
-          {toast.show && (
-            <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50">
-              <div className={`px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold flex items-center gap-2 border ${
+          runAuth();
+          var unsubscribe = auth.onAuthStateChanged(function(u) {
+            if (u) setUser(u);
+          });
+          return function() { unsubscribe(); };
+        }, []);
+
+        useEffect(function() {
+          if (!firebaseReady || !db || !user) {
+            setProjects(INITIAL_PROJECTS);
+            return;
+          }
+
+          try {
+            var collectionPath = 'artifacts/' + appId + '/public/data/projects';
+            var unsubscribe = db.collection(collectionPath).onSnapshot(
+              function(snapshot) {
+                if (snapshot.empty) {
+                  setProjects(INITIAL_PROJECTS);
+                } else {
+                  var data = snapshot.docs.map(function(doc) {
+                    return Object.assign({ id: doc.id }, doc.data());
+                  });
+                  setProjects(data);
+                }
+              }, 
+              function(error) {
+                console.error('Firestore 訂閱失敗:', error);
+                setStatusBanner({ 
+                  type: 'warning', 
+                  text: '🔒 Firebase Firestore 阻擋了資料讀取。請至 Rules 修改安全性規則為允許讀寫。' 
+                });
+                setProjects(INITIAL_PROJECTS);
+              }
+            );
+            return function() { unsubscribe(); };
+          } catch (err) {
+            console.error('Firestore 初始化失敗:', err);
+            setProjects(INITIAL_PROJECTS);
+          }
+        }, [user]);
+
+        // Layout 組件
+        var Layout = function(props) {
+          return h('div', { className: "min-h-screen bg-slate-50 flex flex-col font-sans antialiased relative" },
+            // Toast 提示
+            toast.show && h('div', { className: "fixed top-5 left-1/2 transform -translate-x-1/2 z-50" },
+              h('div', { className: "px-6 py-3 rounded-xl shadow-2xl text-sm font-semibold flex items-center gap-2 border " + (
                 toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
                 toast.type === 'error' ? 'bg-rose-50 text-rose-800 border-rose-200' :
                 'bg-blue-50 text-blue-800 border-blue-200'
-              }`}>
-                <i className={`fa-solid ${
+              )},
+                h('i', { className: "fa-solid " + (
                   toast.type === 'success' ? 'fa-circle-check text-emerald-500' :
                   toast.type === 'error' ? 'fa-circle-xmark text-rose-500' :
                   'fa-circle-info text-blue-500'
-                }`}></i>
-                {toast.message}
-              </div>
-            </div>
-          )}
-
-          {statusBanner.text && (
-            <div className={`px-4 py-2.5 text-xs sm:text-sm text-center font-bold border-b transition-all duration-300 ${
+                )}),
+                toast.message
+              )
+            ),
+            // Banner 橫幅
+            statusBanner.text && h('div', { className: "px-4 py-2.5 text-xs sm:text-sm text-center font-bold border-b transition-all duration-300 " + (
               statusBanner.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
               statusBanner.type === 'warning' ? 'bg-amber-50 text-amber-800 border-amber-200' :
               'bg-blue-50 text-blue-800 border-blue-200'
-            }`}>
-              <i className={`mr-2 fa-solid ${
+            )},
+              h('i', { className: "mr-2 fa-solid " + (
                 statusBanner.type === 'success' ? 'fa-circle-check text-emerald-500' :
                 statusBanner.type === 'warning' ? 'fa-triangle-exclamation text-amber-500' :
                 'fa-circle-info text-blue-500'
-              }`}></i>
-              {statusBanner.text}
-            </div>
-          )}
-          
-          <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-            <aside className="w-full md:w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 shadow-lg">
-              <div className="p-6 border-b border-slate-800 flex items-center justify-between md:block">
-                <div>
-                  <h1 className="text-lg sm:text-xl font-bold leading-tight tracking-wide text-white">學生資訊競賽</h1>
-                  <p className="text-[10px] text-slate-400 mt-1">作品投稿與審核平台</p>
-                </div>
-              </div>
-              <div className="p-4 flex-1 flex flex-col space-y-6">
-                <div>
-                  <p className="text-[10px] text-slate-500 font-bold mb-2 uppercase tracking-wider">切換使用者視角</p>
-                  <select 
-                    className="w-full bg-slate-800 text-xs sm:text-sm border-none rounded-lg p-2.5 text-white outline-none cursor-pointer hover:bg-slate-700 transition"
-                    value={role}
-                    onChange={(e) => {
-                      setRole(e.target.value);
-                      setCurrentView('DASHBOARD');
-                      setSelectedProject(null);
-                    }}
-                  >
-                    <option value="STUDENT">👨‍🎓 學生 (投稿者介面)</option>
-                    <option value="TEACHER">👨‍🏫 教師 (評審審核介面)</option>
-                  </select>
-                </div>
-                
-                <nav className="space-y-1.5 flex-1">
-                  <button 
-                    onClick={() => { setCurrentView('DASHBOARD'); setSelectedProject(null); }}
-                    className={`w-full flex items-center space-x-3 p-3 rounded-lg text-sm font-medium transition-all ${
-                      currentView === 'DASHBOARD' || currentView === 'REVIEW_FORM' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    }`}
-                  >
-                    <i className="fa-solid fa-folder-open w-5 text-center"></i>
-                    <span>{role === 'STUDENT' ? '我的作品列表' : '待評審作品'}</span>
-                  </button>
-                  
-                  {role === 'STUDENT' && (
-                    <button 
-                      onClick={() => setCurrentView('SUBMIT_FORM')}
-                      className={`w-full flex items-center space-x-3 p-3 rounded-lg text-sm font-medium transition-all ${
+              )}),
+              statusBanner.text
+            ),
+            // 主體結構
+            h('div', { className: "flex flex-col md:flex-row flex-1 overflow-hidden" },
+              // 側邊欄
+              h('aside', { className: "w-full md:w-64 bg-slate-900 text-white flex flex-col flex-shrink-0 shadow-lg" },
+                h('div', { className: "p-6 border-b border-slate-800 flex items-center justify-between md:block" },
+                  h('div', null,
+                    h('h1', { className: "text-lg sm:text-xl font-bold leading-tight tracking-wide text-white" }, "學生資訊競賽"),
+                    h('p', { className: "text-[10px] text-slate-400 mt-1" }, "作品投稿與審核平台")
+                  )
+                ),
+                h('div', { className: "p-4 flex-1 flex flex-col space-y-6" },
+                  h('div', null,
+                    h('p', { className: "text-[10px] text-slate-500 font-bold mb-2 uppercase tracking-wider" }, "切換使用者視角"),
+                    h('select', {
+                      className: "w-full bg-slate-800 text-xs sm:text-sm border-none rounded-lg p-2.5 text-white outline-none cursor-pointer hover:bg-slate-700 transition",
+                      value: role,
+                      onChange: function(e) {
+                        setRole(e.target.value);
+                        setCurrentView('DASHBOARD');
+                        setSelectedProject(null);
+                      }
+                    },
+                      h('option', { value: "STUDENT" }, "👨‍🎓 學生 (投稿者介面)"),
+                      h('option', { value: "TEACHER" }, "👨‍🏫 教師 (評審審核介面)")
+                    )
+                  ),
+                  h('nav', { className: "space-y-1.5 flex-1" },
+                    h('button', {
+                      onClick: function() { setCurrentView('DASHBOARD'); setSelectedProject(null); },
+                      className: "w-full flex items-center space-x-3 p-3 rounded-lg text-sm font-medium transition-all " + (
+                        currentView === 'DASHBOARD' || currentView === 'REVIEW_FORM' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      )
+                    },
+                      h('i', { className: "fa-solid fa-folder-open w-5 text-center" }),
+                      h('span', null, role === 'STUDENT' ? '我的作品列表' : '待評審作品')
+                    ),
+                    role === 'STUDENT' && h('button', {
+                      onClick: function() { setCurrentView('SUBMIT_FORM'); },
+                      className: "w-full flex items-center space-x-3 p-3 rounded-lg text-sm font-medium transition-all " + (
                         currentView === 'SUBMIT_FORM' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <i className="fa-solid fa-cloud-arrow-up w-5 text-center"></i>
-                      <span>新增競賽投稿</span>
-                    </button>
-                  )}
-                </nav>
-              </div>
-            </aside>
+                      )
+                    },
+                      h('i', { className: "fa-solid fa-cloud-arrow-up w-5 text-center" }),
+                      h('span', null, "新增競賽投稿")
+                    )
+                  )
+                )
+              ),
+              // 主顯示區
+              h('main', { className: "flex-1 overflow-y-auto bg-slate-50 flex flex-col" },
+                h('header', { className: "bg-white shadow-sm h-16 flex items-center justify-between px-6 sm:px-8 border-b border-slate-100 flex-shrink-0" },
+                  h('h2', { className: "text-base sm:text-lg font-bold text-slate-800" },
+                    currentView === 'DASHBOARD' && (role === 'STUDENT' ? '📁 投稿歷史紀錄' : '📥 參賽作品審核列表'),
+                    currentView === 'SUBMIT_FORM' && '✍️ 新增參賽作品',
+                    currentView === 'REVIEW_FORM' && '🔍 評審作品審查與評分'
+                  ),
+                  h('div', { className: "flex items-center space-x-3 text-right" },
+                    h('div', { className: "hidden sm:block" },
+                      h('p', { className: "text-xs text-slate-400" }, "目前使用者"),
+                      h('p', { className: "text-sm font-semibold text-slate-700" }, role === 'STUDENT' ? '王小明 同學' : '李教授評審')
+                    ),
+                    h('div', { className: "h-9 w-9 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-sm" },
+                      role === 'STUDENT' ? '明' : '評'
+                    )
+                  )
+                ),
+                h('div', { className: "p-4 sm:p-8 flex-1" }, props.children)
+              )
+            )
+          );
+        };
 
-            <main className="flex-1 overflow-y-auto bg-slate-50 flex flex-col">
-              <header className="bg-white shadow-sm h-16 flex items-center justify-between px-6 sm:px-8 border-b border-slate-100 flex-shrink-0">
-                <h2 className="text-base sm:text-lg font-bold text-slate-800">
-                  {currentView === 'DASHBOARD' && (role === 'STUDENT' ? '📁 投稿歷史紀錄' : '📥 參賽作品審核列表')}
-                  {currentView === 'SUBMIT_FORM' && '✍️ 新增參賽作品'}
-                  {currentView === 'REVIEW_FORM' && '🔍 評審作品審查與評分'}
-                </h2>
-                <div className="flex items-center space-x-3 text-right">
-                  <div className="hidden sm:block">
-                    <p className="text-xs text-slate-400">目前使用者</p>
-                    <p className="text-sm font-semibold text-slate-700">{role === 'STUDENT' ? '王小明 同學' : '李教授評審'}</p>
-                  </div>
-                  <div className="h-9 w-9 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-sm">
-                    {role === 'STUDENT' ? '明' : '評'}
-                  </div>
-                </div>
-              </header>
+        // 學生端投稿組件
+        var StudentSubmitForm = function() {
+          var formState = useState({ title: '', category: '軟體開發組', className: '', advisor: '', summary: '' });
+          var formData = formState[0];
+          var setFormData = formState[1];
 
-              <div className="p-4 sm:p-8 flex-1">
-                {children}
-              </div>
-            </main>
-          </div>
-        </div>
-      );
+          var submitState = useState(false);
+          var submitting = submitState[0];
+          var setSubmitting = submitState[1];
 
-      const StudentSubmitForm = () => {
-        const [formData, setFormData] = useState({
-          title: '', category: '軟體開發組', className: '', advisor: '', summary: ''
-        });
-        const [submitting, setSubmitting] = useState(false);
+          var handleSave = async function(isDraft) {
+            if (!formData.title.trim()) {
+              triggerToast("請輸入作品名稱！", "error");
+              return;
+            }
+            
+            setSubmitting(true);
+            var targetStatus = isDraft ? 'DRAFT' : 'SUBMITTED';
 
-        const handleSave = async (isDraft) => {
-          if (!formData.title.trim()) {
-            triggerToast("請輸入作品名稱！", "error");
-            return;
-          }
-          
-          setSubmitting(true);
-          const targetStatus = isDraft ? 'DRAFT' : 'SUBMITTED';
+            var newProject = {
+              title: formData.title,
+              category: formData.category,
+              school: formData.className || '未填寫班級',
+              student: '王小明',
+              advisor: formData.advisor || '無',
+              summary: formData.summary || '未提供作品摘要。',
+              date: new Date().toISOString().split('T')[0],
+              status: targetStatus
+            };
 
-          const newProject = {
-            title: formData.title,
-            category: formData.category,
-            school: formData.className || '未填寫班級',
-            student: '王小明',
-            advisor: formData.advisor || '無',
-            summary: formData.summary || '未提供作品摘要。',
-            date: new Date().toISOString().split('T')[0],
-            status: targetStatus
+            if (!firebaseReady || !db || !user) {
+              var simulatedId = 'local-' + Date.now();
+              setProjects(function(prev) { return [Object.assign({ id: simulatedId }, newProject)].concat(prev); });
+              triggerToast("[模擬成功] 已於本地暫存：" + (isDraft ? '草稿' : '已送出作品'), "success");
+              setCurrentView('DASHBOARD');
+              setSubmitting(false);
+              return;
+            }
+
+            try {
+              var collectionPath = 'artifacts/' + appId + '/public/data/projects';
+              await db.collection(collectionPath).add(newProject);
+              triggerToast(isDraft ? '草稿儲存成功！' : '作品提交成功，等待審核中！', "success");
+              setCurrentView('DASHBOARD');
+            } catch (err) {
+              console.error(err);
+              triggerToast('雲端儲存失敗，請檢查安全規則。', "error");
+            } finally {
+              setSubmitting(false);
+            }
           };
 
-          if (!firebaseReady || !db || !user) {
-            const simulatedId = 'local-' + Date.now();
-            setProjects(prev => [{ id: simulatedId, ...newProject }, ...prev]);
-            triggerToast(`[模擬成功] 由於未連接 Firebase，已於本地暫存：${isDraft ? '草稿' : '已送出作品'}。`, "success");
-            setCurrentView('DASHBOARD');
-            setSubmitting(false);
-            return;
-          }
-
-          try {
-            const collectionPath = `artifacts/${appId}/public/data/projects`;
-            await db.collection(collectionPath).add(newProject);
-            triggerToast(isDraft ? '草稿儲存成功！' : '作品提交成功，等待審核中！', "success");
-            setCurrentView('DASHBOARD');
-          } catch (err) {
-            console.error(err);
-            triggerToast('雲端儲存失敗，請檢查安全規則。', "error");
-          } finally {
-            setSubmitting(false);
-          }
+          return h('div', { className: "max-w-3xl bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-100" },
+            h('h3', { className: "text-base sm:text-lg font-bold text-slate-800 mb-6 border-b pb-3" }, "參賽基本資料填寫"),
+            h('div', { className: "space-y-6" },
+              h('div', { className: "grid grid-cols-1 sm:grid-cols-2 gap-6" },
+                h('div', null,
+                  h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "作品名稱 ", h('span', { className: "text-red-500" }, "*")),
+                  h('input', {
+                    type: "text",
+                    value: formData.title,
+                    onChange: function(e) { setFormData(Object.assign({}, formData, { title: e.target.value })); },
+                    className: "w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm",
+                    placeholder: "請輸入作品完整名稱"
+                  })
+                ),
+                h('div', null,
+                  h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "競賽組別 ", h('span', { className: "text-red-500" }, "*")),
+                  h('select', {
+                    value: formData.category,
+                    onChange: function(e) { setFormData(Object.assign({}, formData, { category: e.target.value })); },
+                    className: "w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white transition cursor-pointer text-sm"
+                  },
+                    MOCK_CATEGORIES.map(function(c) { return h('option', { key: c, value: c }, c); })
+                  )
+                ),
+                h('div', null,
+                  h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "班級 / 單位 ", h('span', { className: "text-red-500" }, "*")),
+                  h('input', {
+                    type: "text",
+                    value: formData.className,
+                    onChange: function(e) { setFormData(Object.assign({}, formData, { className: e.target.value })); },
+                    className: "w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm",
+                    placeholder: "例如：資工三甲"
+                  })
+                ),
+                h('div', null,
+                  h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "指導老師 (選填)"),
+                  h('input', {
+                    type: "text",
+                    value: formData.advisor,
+                    onChange: function(e) { setFormData(Object.assign({}, formData, { advisor: e.target.value })); },
+                    className: "w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm",
+                    placeholder: "若無則留空"
+                  })
+                )
+              ),
+              h('div', null,
+                h('label', { className: "block text-sm font-semibold text-slate-700 mb-2" }, "作品摘要概述"),
+                h('textarea', {
+                  rows: "4",
+                  value: formData.summary,
+                  onChange: function(e) { setFormData(Object.assign({}, formData, { summary: e.target.value })); },
+                  className: "w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition resize-none text-sm",
+                  placeholder: "請簡短描述作品的設計理念與核心功能"
+                })
+              ),
+              h('div', { className: "border border-slate-200 rounded-xl p-5 bg-slate-50/50" },
+                h('h4', { className: "text-sm font-bold text-slate-800 mb-3" }, h('i', { className: "fa-solid fa-paperclip mr-2 text-blue-500" }), "模擬參賽附檔"),
+                h('div', { className: "border-2 border-dashed border-slate-200 rounded-lg p-6 text-center bg-white hover:border-blue-400 transition cursor-pointer" },
+                  h('i', { className: "fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2 block" }),
+                  h('p', { className: "text-xs sm:text-sm text-slate-600 font-medium" }, "點擊或拖曳檔案至此區域上傳"),
+                  h('p', { className: "text-[11px] text-slate-400 mt-1" }, "支援 PDF, ZIP, PPT, MP4 等格式，大小上限 100MB")
+                )
+              ),
+              h('div', { className: "flex justify-end space-x-3 pt-4 border-t border-slate-100" },
+                h('button', {
+                  type: "button",
+                  disabled: submitting,
+                  onClick: function() { handleSave(true); },
+                  className: "px-5 py-2.5 border border-slate-200 rounded-lg text-slate-700 font-medium hover:bg-slate-50 transition active:scale-[0.98] disabled:opacity-50 text-sm"
+                }, "儲存為草稿"),
+                h('button', {
+                  type: "button",
+                  disabled: submitting,
+                  onClick: function() { handleSave(false); },
+                  className: "px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 transition active:scale-[0.98] disabled:opacity-50 text-sm"
+                }, submitting ? '提交中...' : '送出審查')
+              )
+            )
+          );
         };
 
-        return (
-          <div className="max-w-3xl bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-6 border-b pb-3">參賽基本資料填寫</h3>
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">作品名稱 <span className="text-red-500">*</span></label>
-                  <input 
-                    type="text" 
-                    value={formData.title} 
-                    onChange={e => setFormData({...formData, title: e.target.value})} 
-                    className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm" 
-                    placeholder="請輸入作品完整名稱" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">競賽組別 <span className="text-red-500">*</span></label>
-                  <select 
-                    value={formData.category} 
-                    onChange={e => setFormData({...formData, category: e.target.value})} 
-                    className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white transition cursor-pointer text-sm"
-                  >
-                    {MOCK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">班級 / 單位 <span className="text-red-500">*</span></label>
-                  <input 
-                    type="text" 
-                    value={formData.className} 
-                    onChange={e => setFormData({...formData, className: e.target.value})} 
-                    className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm" 
-                    placeholder="例如：資工三甲" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">指導老師 (選填)</label>
-                  <input 
-                    type="text" 
-                    value={formData.advisor} 
-                    onChange={e => setFormData({...formData, advisor: e.target.value})} 
-                    className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition text-sm" 
-                    placeholder="若無則留空" 
-                  />
-                </div>
-              </div>
+        // 教師端審核組件
+        var TeacherReviewForm = function() {
+          var feedbackState = useState('');
+          var feedback = feedbackState[0];
+          var setFeedback = feedbackState[1];
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">作品摘要概述</label>
-                <textarea 
-                  rows="4"
-                  value={formData.summary}
-                  onChange={e => setFormData({...formData, summary: e.target.value})}
-                  className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition resize-none text-sm"
-                  placeholder="請簡短描述作品的設計理念與核心功能"
-                />
-              </div>
+          var updateState = useState(false);
+          var updating = updateState[0];
+          var setUpdating = updateState[1];
 
-              <div className="border border-slate-200 rounded-xl p-5 bg-slate-50/50">
-                <h4 className="text-sm font-bold text-slate-800 mb-3"><i className="fa-solid fa-paperclip mr-2 text-blue-500"></i>模擬參賽附檔</h4>
-                <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center bg-white hover:border-blue-400 transition cursor-pointer">
-                  <i className="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2 block"></i>
-                  <p className="text-xs sm:text-sm text-slate-600 font-medium">點擊或拖曳檔案至此區域上傳</p>
-                  <p className="text-[11px] text-slate-400 mt-1">支援 PDF, ZIP, PPT, MP4 等格式，大小上限 100MB</p>
-                </div>
-              </div>
+          if (!selectedProject) return null;
 
-              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-                <button 
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => handleSave(true)}
-                  className="px-5 py-2.5 border border-slate-200 rounded-lg text-slate-700 font-medium hover:bg-slate-50 transition active:scale-[0.98] disabled:opacity-50 text-sm"
-                >
-                  儲存為草稿
-                </button>
-                <button 
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => handleSave(false)}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 transition active:scale-[0.98] disabled:opacity-50 text-sm"
-                >
-                  {submitting ? '提交中...' : '送出審查'}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      };
+          var handleUpdateStatus = async function(newStatus) {
+            setUpdating(true);
 
-      const TeacherReviewForm = () => {
-        const [feedback, setFeedback] = useState('');
-        const [updating, setUpdating] = useState(false);
+            if (!firebaseReady || !db || !user || String(selectedProject.id).indexOf('mock-') === 0 || String(selectedProject.id).indexOf('local-') === 0) {
+              setProjects(function(prev) {
+                return prev.map(function(p) {
+                  return p.id === selectedProject.id ? Object.assign({}, p, { status: newStatus }) : p;
+                });
+              });
+              triggerToast("[模擬成功] 狀態切換為：" + MOCK_STATUSES[newStatus].label, "success");
+              setCurrentView('DASHBOARD');
+              setSelectedProject(null);
+              setUpdating(false);
+              return;
+            }
 
-        if (!selectedProject) return null;
+            try {
+              var collectionPath = 'artifacts/' + appId + '/public/data/projects';
+              await db.collection(collectionPath).doc(selectedProject.id).update({
+                status: newStatus,
+                teacherFeedback: feedback || '無具體修改意見。'
+              });
+              triggerToast("審核完成：" + MOCK_STATUSES[newStatus].label, "success");
+              setCurrentView('DASHBOARD');
+              setSelectedProject(null);
+            } catch (err) {
+              console.error(err);
+              triggerToast('寫入雲端失敗，請確認資料庫權限是否開啟。', "error");
+            } finally {
+              setUpdating(false);
+            }
+          };
 
-        const handleUpdateStatus = async (newStatus) => {
-          setUpdating(true);
-
-          if (!firebaseReady || !db || !user || String(selectedProject.id).startsWith('mock-') || String(selectedProject.id).startsWith('local-')) {
-            setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, status: newStatus } : p));
-            triggerToast(`[模擬成功] 狀態切換為：${MOCK_STATUSES[newStatus].label}`, "success");
-            setCurrentView('DASHBOARD');
-            setSelectedProject(null);
-            setUpdating(false);
-            return;
-          }
-
-          try {
-            const collectionPath = `artifacts/${appId}/public/data/projects`;
-            await db.collection(collectionPath).doc(selectedProject.id).update({
-              status: newStatus,
-              teacherFeedback: feedback || '無具體修改意見。'
-            });
-            triggerToast(`審核完成：${MOCK_STATUSES[newStatus].label}`, "success");
-            setCurrentView('DASHBOARD');
-            setSelectedProject(null);
-          } catch (err) {
-            console.error(err);
-            triggerToast('寫入雲端失敗，請確認資料庫權限是否開啟。', "error");
-          } finally {
-            setUpdating(false);
-          }
+          return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8" },
+            h('div', { className: "lg:col-span-2 space-y-6" },
+              h('div', { className: "bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-100" },
+                h('div', { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-6" },
+                  h('div', null,
+                    h('span', { className: "text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-bold" }, selectedProject.category),
+                    h('h2', { className: "text-xl sm:text-2xl font-bold text-slate-800 mt-2" }, selectedProject.title)
+                  ),
+                  h('span', { className: "px-3 py-1 rounded-full text-xs font-bold self-start sm:self-auto " + (MOCK_STATUSES[selectedProject.status]?.color || 'bg-slate-100 text-slate-700') },
+                    MOCK_STATUSES[selectedProject.status]?.label || selectedProject.status
+                  )
+                ),
+                h('div', { className: "grid grid-cols-2 gap-4 text-xs sm:text-sm text-slate-600 mb-6 bg-slate-50 p-4 rounded-lg" },
+                  h('p', null, h('span', { className: "text-slate-400 mr-2" }, "參賽學生:"), selectedProject.student),
+                  h('p', null, h('span', { className: "text-slate-400 mr-2" }, "所屬班級:"), selectedProject.school),
+                  h('p', null, h('span', { className: "text-slate-400 mr-2" }, "指導老師:"), selectedProject.advisor || '無'),
+                  h('p', null, h('span', { className: "text-slate-400 mr-2" }, "提交時間:"), selectedProject.date)
+                ),
+                h('div', { className: "mb-6" },
+                  h('h4', { className: "font-bold text-slate-800 mb-2" }, "作品摘要簡介"),
+                  h('p', { className: "text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-lg border border-slate-100" },
+                    selectedProject.summary || '此項目為預設導入之專案範本。本作品整合人工智慧技術與前端直覺操作，旨在解決日常校園內各領域之科技痛點。'
+                  )
+                )
+              )
+            ),
+            h('div', { className: "lg:col-span-1" },
+              h('div', { className: "bg-white p-6 rounded-xl shadow-sm border border-slate-100 sticky top-6" },
+                h('h3', { className: "text-base font-bold text-slate-800 mb-4 border-b pb-2" }, h('i', { className: "fa-solid fa-feather mr-2 text-indigo-500" }), "審定決議意見"),
+                h('div', { className: "space-y-4" },
+                  h('div', null,
+                    h('label', { className: "block text-xs font-bold text-slate-500 mb-1" }, "評審綜合評語 (修改建議)"),
+                    h('textarea', {
+                      rows: "4",
+                      value: feedback,
+                      onChange: function(e) { setFeedback(e.target.value); },
+                      className: "w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-xs transition resize-none",
+                      placeholder: "請填寫評語或具體修改要求..."
+                    })
+                  ),
+                  h('div', { className: "space-y-2 pt-2 border-t border-slate-100" },
+                    h('button', {
+                      disabled: updating,
+                      onClick: function() { handleUpdateStatus('APPROVED'); },
+                      className: "w-full py-2.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center justify-center space-x-2 shadow-sm"
+                    }, h('i', { className: "fa-solid fa-circle-check" }), h('span', null, "通過此項審查")),
+                    h('button', {
+                      disabled: updating,
+                      onClick: function() { handleUpdateStatus('REVISION_REQUIRED'); },
+                      className: "w-full py-2.5 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 transition flex items-center justify-center space-x-2 shadow-sm"
+                    }, h('i', { className: "fa-solid fa-triangle-exclamation" }), h('span', null, "通知學生補件")),
+                    h('button', {
+                      disabled: updating,
+                      onClick: function() { handleUpdateStatus('REJECTED'); },
+                      className: "w-full py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-100 transition flex items-center justify-center space-x-2"
+                    }, h('i', { className: "fa-solid fa-circle-xmark" }), h('span', null, "退回不予通過"))
+                  ),
+                  h('button', {
+                    onClick: function() { setCurrentView('DASHBOARD'); setSelectedProject(null); },
+                    className: "w-full text-center text-xs text-slate-400 hover:text-slate-600 py-1 transition"
+                  }, "取消並返回列表")
+                )
+              )
+            )
+          );
         };
 
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-100">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-6">
-                  <div>
-                    <span className="text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full font-bold">{selectedProject.category}</span>
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mt-2">{selectedProject.title}</h2>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold self-start sm:self-auto ${MOCK_STATUSES[selectedProject.status]?.color || 'bg-slate-100 text-slate-700'}`}>
-                    {MOCK_STATUSES[selectedProject.status]?.label || selectedProject.status}
-                  </span>
-                </div>
+        // 總覽列表
+        var DashboardList = function() {
+          var displayProjects = role === 'STUDENT'
+            ? projects.filter(function(p) { return p.student === '王小明'; })
+            : projects;
 
-                <div className="grid grid-cols-2 gap-4 text-xs sm:text-sm text-slate-600 mb-6 bg-slate-50 p-4 rounded-lg">
-                  <p><span className="text-slate-400 mr-2">參賽學生:</span> {selectedProject.student}</p>
-                  <p><span className="text-slate-400 mr-2">所屬班級:</span> {selectedProject.school}</p>
-                  <p><span className="text-slate-400 mr-2">指導老師:</span> {selectedProject.advisor || '無'}</p>
-                  <p><span className="text-slate-400 mr-2">提交時間:</span> {selectedProject.date}</p>
-                </div>
+          return h('div', { className: "space-y-6" },
+            role === 'TEACHER' && h('div', { className: "grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" },
+              h('div', { className: "bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
+                h('div', { className: "p-2.5 bg-blue-50 text-blue-600 rounded-lg text-lg" }, h('i', { className: "fa-solid fa-list-check w-5 text-center" })),
+                h('div', null,
+                  h('p', { className: "text-[10px] text-slate-400 font-bold uppercase" }, "總收件數"),
+                  h('p', { className: "text-lg font-bold text-slate-800" }, projects.length)
+                )
+              ),
+              h('div', { className: "bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
+                h('div', { className: "p-2.5 bg-emerald-50 text-emerald-600 rounded-lg text-lg" }, h('i', { className: "fa-solid fa-shield-heart w-5 text-center" })),
+                h('div', null,
+                  h('p', { className: "text-[10px] text-slate-400 font-bold uppercase" }, "審定通過"),
+                  h('p', { className: "text-lg font-bold text-slate-800" }, projects.filter(function(p) { return p.status === 'APPROVED'; }).length)
+                )
+              ),
+              h('div', { className: "bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
+                h('div', { className: "p-2.5 bg-amber-50 text-amber-600 rounded-lg text-lg" }, h('i', { className: "fa-solid fa-hourglass-half w-5 text-center" })),
+                h('div', null,
+                  h('p', { className: "text-[10px] text-slate-400 font-bold uppercase" }, "待處理件"),
+                  h('p', { className: "text-lg font-bold text-slate-800" }, projects.filter(function(p) { return p.status === 'SUBMITTED' || p.status === 'REVIEWING'; }).length)
+                )
+              ),
+              h('div', { className: "bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
+                h('div', { className: "p-2.5 bg-rose-50 text-rose-600 rounded-lg text-lg" }, h('i', { className: "fa-solid fa-triangle-exclamation w-5 text-center" })),
+                h('div', null,
+                  h('p', { className: "text-[10px] text-slate-400 font-bold uppercase" }, "需補件件"),
+                  h('p', { className: "text-lg font-bold text-slate-800" }, projects.filter(function(p) { return p.status === 'REVISION_REQUIRED'; }).length)
+                )
+              )
+            ),
+            h('div', { className: "bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden" },
+              h('div', { className: "p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4" },
+                h('div', { className: "w-full sm:flex-1 relative" },
+                  h('i', { className: "fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 text-xs" }),
+                  h('input', {
+                    type: "text",
+                    placeholder: "搜尋參賽作品名稱、作者...",
+                    className: "w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition"
+                  })
+                )
+              ),
+              h('div', { className: "overflow-x-auto" },
+                h('table', { className: "w-full text-left text-xs sm:text-sm whitespace-nowrap" },
+                  h('thead', { className: "bg-slate-50 text-slate-500 font-semibold border-b border-slate-100" },
+                    h('tr', null,
+                      h('th', { className: "py-3 px-6" }, "作品項目名稱"),
+                      h('th', { className: "py-3 px-6" }, "組別類別"),
+                      h('th', { className: "py-3 px-6" }, role === 'STUDENT' ? '上傳日期' : '投稿學生/學校'),
+                      h('th', { className: "py-3 px-6 text-center" }, "評審審查狀態"),
+                      h('th', { className: "py-3 px-6 text-right" }, "操作選項")
+                    )
+                  ),
+                  h('tbody', { className: "divide-y divide-slate-100" },
+                    displayProjects.map(function(project) {
+                      return h('tr', { key: project.id, className: "hover:bg-slate-50/50 transition" },
+                        h('td', { className: "py-4 px-6 font-semibold text-slate-800" },
+                          h('div', { className: "max-w-xs sm:max-w-md truncate" }, project.title)
+                        ),
+                        h('td', { className: "py-4 px-6 text-slate-500 text-xs font-medium" }, project.category),
+                        h('td', { className: "py-4 px-6 text-slate-500" },
+                          role === 'STUDENT' ? project.date : h('div', null,
+                            h('p', { className: "font-medium text-slate-700" }, project.student),
+                            h('p', { className: "text-[10px] text-slate-400" }, project.school)
+                          )
+                        ),
+                        h('td', { className: "py-4 px-6 text-center" },
+                          h('span', { className: "px-2.5 py-1 rounded-full text-[10px] font-bold inline-block shadow-sm " + (MOCK_STATUSES[project.status]?.color || 'bg-slate-100 text-slate-700') },
+                            MOCK_STATUSES[project.status]?.label || project.status
+                          )
+                        ),
+                        h('td', { className: "py-4 px-6 text-right text-xs" },
+                          role === 'TEACHER' ? h('button', {
+                            onClick: function() { setSelectedProject(project); setCurrentView('REVIEW_FORM'); },
+                            className: "bg-blue-50 text-blue-600 font-bold px-3 py-1.5 rounded-lg hover:bg-blue-100 active:scale-95 transition mr-2"
+                          },
+                            h('i', { className: "fa-solid fa-magnifying-glass mr-1" }),
+                            "審查評估"
+                          ) : h('button', {
+                            onClick: function() { triggerToast("【專案詳情：" + project.title + "】狀態：" + MOCK_STATUSES[project.status]?.label, "info"); },
+                            className: "text-slate-500 hover:text-slate-800 font-medium px-2 py-1 rounded transition"
+                          }, "查看詳細")
+                        )
+                      );
+                    })
+                  )
+                )
+              )
+            )
+          );
+        };
 
-                <div className="mb-6">
-                  <h4 className="font-bold text-slate-800 mb-2">作品摘要簡介</h4>
-                  <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-lg border border-slate-100">
-                    {selectedProject.summary || '此項目為預設導入之專案範本。本作品整合人工智慧技術與前端直覺操作，旨在解決日常校園內各領域之科技痛點。'}
-                  </p>
-                </div>
-              </div>
-            </div>
+        // 渲染對應視角
+        var renderView = function() {
+          if (currentView === 'DASHBOARD') return h(DashboardList);
+          if (currentView === 'SUBMIT_FORM') return h(StudentSubmitForm);
+          if (currentView === 'REVIEW_FORM') return h(TeacherReviewForm);
+          return null;
+        };
 
-            <div className="lg:col-span-1">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 sticky top-6">
-                <h3 className="text-base font-bold text-slate-800 mb-4 border-b pb-2"><i className="fa-solid fa-feather mr-2 text-indigo-500"></i>審定決議意見</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">評審綜合評語 (修改建議)</label>
-                    <textarea 
-                      rows="4"
-                      value={feedback}
-                      onChange={e => setFeedback(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-xs transition resize-none"
-                      placeholder="請填寫評語或具體修改要求..."
-                    />
-                  </div>
+        return h(Layout, null, renderView());
+      }
 
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    <button 
-                      disabled={updating}
-                      onClick={() => handleUpdateStatus('APPROVED')}
-                      className="w-full py-2.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center justify-center space-x-2 shadow-sm"
-                    >
-                      <i className="fa-solid fa-circle-check"></i>
-                      <span>通過此項審查</span>
-                    </button>
-
-                    <button 
-                      disabled={updating}
-                      onClick={() => handleUpdateStatus('REVISION_REQUIRED')}
-                      className="w-full py-2.5 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 transition flex items-center justify-center space-x-2 shadow-sm"
-                    >
-                      <i className="fa-solid fa-triangle-exclamation"></i>
-                      <span>通知學生補件</span>
-                    </button>
-
-                    <button 
-                      disabled={updating}
-                      onClick={() => handleUpdateStatus('REJECTED')}
-                      className="w-full py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-100 transition flex items-center justify-center space-x-2"
-                    >
-                      <i className="fa-solid fa-circle-xmark"></i>
-                      <span>退回不予通過</span>
-                    </button>
-                  </div>
-
-                  <button 
-                    onClick={() => { setCurrentView('DASHBOARD'); setSelectedProject(null); }}
-                    className="w-full text-center text-xs text-slate-400 hover:text-slate-600 py-1 transition"
-                  >
-                    取消並返回列表
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      };
-
-      const DashboardList = () => {
-        const displayProjects = role === 'STUDENT'
-          ? projects.filter(p => p.student === '王小明')
-          : projects;
-
-        return (
-          <div className="space-y-6">
-            {role === 'TEACHER' && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-3.5">
-                  <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg text-lg"><i className="fa-solid fa-list-check w-5 text-center"></i></div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">總收件數</p>
-                    <p className="text-lg font-bold text-slate-800">{projects.length}</p>
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-3.5">
-                  <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg text-lg"><i className="fa-solid fa-shield-heart w-5 text-center"></i></div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">審定通過</p>
-                    <p className="text-lg font-bold text-slate-800">{projects.filter(p => p.status === 'APPROVED').length}</p>
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-3.5">
-                  <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg text-lg"><i className="fa-solid fa-hourglass-half w-5 text-center"></i></div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">待處理件</p>
-                    <p className="text-lg font-bold text-slate-800">{projects.filter(p => p.status === 'SUBMITTED' || p.status === 'REVIEWING').length}</p>
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-3.5">
-                  <div className="p-2.5 bg-rose-50 text-rose-600 rounded-lg text-lg"><i className="fa-solid fa-triangle-exclamation w-5 text-center"></i></div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">需補件件</p>
-                    <p className="text-lg font-bold text-slate-800">{projects.filter(p => p.status === 'REVISION_REQUIRED').length}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="w-full sm:flex-1 relative">
-                  <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 text-xs"></i>
-                  <input 
-                    type="text" 
-                    placeholder="搜尋參賽作品名稱、作者..." 
-                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition" 
-                  />
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs sm:text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                    <tr>
-                      <th className="py-3 px-6">作品項目名稱</th>
-                      <th className="py-3 px-6">組別類別</th>
-                      <th className="py-3 px-6">{role === 'STUDENT' ? '上傳日期' : '投稿學生/學校'}</th>
-                      <th className="py-3 px-6 text-center">評審審查狀態</th>
-                      <th className="py-3 px-6 text-right">操作選項</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {displayProjects.map((project) => (
-                      <tr key={project.id} className="hover:bg-slate-50/50 transition">
-                        <td className="py-4 px-6 font-semibold text-slate-800">
-                          <div className="max-w-xs sm:max-w-md truncate">
-                            {project.title}
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-slate-500 text-xs font-medium">{project.category}</td>
-                        <td className="py-4 px-6 text-slate-500">
-                          {role === 'STUDENT' ? project.date : (
-                            <div>
-                              <p className="font-medium text-slate-700">{project.student}</p>
-                              <p className="text-[10px] text-slate-400">{project.school}</p>
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-block shadow-sm ${MOCK_STATUSES[project.status]?.color || 'bg-slate-100 text-slate-700'}`}>
-                            {MOCK_STATUSES[project.status]?.label || project.status}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-right text-xs">
-                          {role === 'TEACHER' ? (
-                            <button 
-                              onClick={() => { setSelectedProject(project); setCurrentView('REVIEW_FORM'); }} 
-                              className="bg-blue-50 text-blue-600 font-bold px-3 py-1.5 rounded-lg hover:bg-blue-100 active:scale-95 transition mr-2"
-                            >
-                              <i className="fa-solid fa-magnifying-glass mr-1"></i>
-                              審查評估
-                            </button>
-                          ) : (
-                            <button 
-                              onClick={() => triggerToast(`【專案詳情：${project.title}】狀態：${MOCK_STATUSES[project.status]?.label}`, "info")}
-                              className="text-slate-500 hover:text-slate-800 font-medium px-2 py-1 rounded transition"
-                            >
-                              查看詳細
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
-      };
-
-      return (
-        <Layout>
-          {currentView === 'DASHBOARD' && <DashboardList />}
-          {currentView === 'SUBMIT_FORM' && <StudentSubmitForm />}
-          {currentView === 'REVIEW_FORM' && <TeacherReviewForm />}
-        </Layout>
-      );
-    }
-
-    try {
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(<App />);
-    } catch (e) {
-      console.error(e);
-    }
+      // 直接使用 React 渲染至 root，不經過任何 Babel 即時編譯器！
+      var root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(h(App));
+    })();
   </script>
 </body>
 </html>
