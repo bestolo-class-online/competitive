@@ -19,6 +19,17 @@
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+
+  <!-- 加入自訂精美動畫樣式 -->
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.15s ease-out forwards;
+    }
+  </style>
 </head>
 <body class="bg-slate-50 min-h-screen">
   
@@ -132,7 +143,6 @@
         var accState = useState('');
         var pwState = useState('');
         
-        // 💡 僅返回登入卡片，測試用的內置展示帳號面板已被移至外部 HTML 註解內，不予呈現
         return h('div', { className: "min-h-screen flex flex-col justify-center items-center px-4 bg-gradient-to-tr from-slate-100 to-slate-200" },
           h('div', { className: "w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-slate-100" },
             h('div', { className: "text-center mb-8" },
@@ -592,7 +602,7 @@
       }
 
       // ==========================================
-      // 獨立元件 4: 管理員帳號維護面板
+      // 獨立元件 4: 管理員帳號維護面板 (💡 已完全取代原生 confirm() 防沙盒)
       // ==========================================
       function AdminUsersView(props) {
         var users = props.users;
@@ -607,6 +617,7 @@
         var setNewUser = newUserState[1];
         
         var editingState = useState(false);
+        var deleteConfirmState = useState(null); // 安全刪除帳號確認 (account 或是 null)
 
         var handleSaveUser = async function() {
           if (!newUser.account.trim() || !newUser.password.trim() || !newUser.name.trim()) {
@@ -633,23 +644,52 @@
           editingState[1](false);
         };
 
-        var handleDeleteUser = async function(account) {
+        var handleDeleteUserClick = function(account) {
           if (account === 'admin') {
             triggerToast("安全警示：預設管理員帳號不予刪除！", "error");
             return;
           }
-          if (confirm("確認要刪除此帳號嗎？相關之學生權限將會失效。")) {
-            var updatedList = users.filter(function(u) { return u.account !== account; });
-            await updateUsersDb(updatedList);
-            if (firebaseReady && db) {
-              var usersPath = 'artifacts/' + appId + '/public/data/users';
-              await db.collection(usersPath).doc(account).delete();
-            }
-            triggerToast("帳號已順利刪除。", "success");
-          }
+          deleteConfirmState[1](account); // 觸發自訂確認彈窗
         };
 
-        return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
+        var executeDeleteUser = async function(account) {
+          var updatedList = users.filter(function(u) { return u.account !== account; });
+          await updateUsersDb(updatedList);
+          if (firebaseReady && db) {
+            var usersPath = 'artifacts/' + appId + '/public/data/users';
+            await db.collection(usersPath).doc(account).delete();
+          }
+          triggerToast("帳號已順利刪除。", "success");
+        };
+
+        return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in relative" },
+          // 自訂帳號安全刪除彈出框
+          deleteConfirmState[0] && h('div', { className: "fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 animate-fade-in" },
+            h('div', { className: "bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100" },
+              h('div', { className: "text-center mb-5" },
+                h('div', { className: "mx-auto h-12 w-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center text-xl mb-3" },
+                  h('i', { className: "fa-solid fa-user-slash" })
+                ),
+                h('h3', { className: "text-base font-bold text-slate-800" }, "確定刪除使用者？"),
+                h('p', { className: "text-xs text-slate-500 mt-2 leading-relaxed" }, "您確定要刪除帳號「" + deleteConfirmState[0] + "」嗎？相關學生的投稿管理與登入權限將會永久失效。")
+              ),
+              h('div', { className: "flex gap-3" },
+                h('button', {
+                  onClick: function() { deleteConfirmState[1](null); },
+                  className: "flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+                }, "取消"),
+                h('button', {
+                  onClick: function() {
+                    var acc = deleteConfirmState[0];
+                    deleteConfirmState[1](null);
+                    executeDeleteUser(acc);
+                  },
+                  className: "flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-rose-500/10"
+                }, "確定刪除")
+              )
+            )
+          ),
+
           h('div', { className: "lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100" },
             h('h3', { className: "text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5" },
               h('i', { className: "fa-solid fa-users text-blue-500" }), "現有使用者帳號清冊"
@@ -686,7 +726,7 @@
                           className: "text-blue-600 hover:text-blue-800 text-xs font-bold"
                         }, "編輯"),
                         h('button', {
-                          onClick: function() { handleDeleteUser(u.account); },
+                          onClick: function() { handleDeleteUserClick(u.account); },
                           className: "text-rose-500 hover:text-rose-700 text-xs font-bold"
                         }, "刪除")
                       )
@@ -776,7 +816,7 @@
       }
 
       // ==========================================
-      // 獨立元件 5: 競賽類別管理面板
+      // 獨立元件 5: 競賽類別管理面板 (💡 已完全取代原生 confirm() 防沙盒)
       // ==========================================
       function AdminCategoriesView(props) {
         var categories = props.categories;
@@ -785,6 +825,7 @@
         var triggerToast = props.triggerToast;
 
         var newCatState = useState('');
+        var deleteConfirmState = useState(null); // 自訂安全刪除類別確認
 
         var handleAddCat = function() {
           var val = newCatState[0].trim();
@@ -799,15 +840,44 @@
           newCatState[1]('');
         };
 
-        var handleDeleteCat = function(c) {
-          if (confirm("確認要刪除「" + c + "」組別類別嗎？")) {
-            var updated = categories.filter(function(cat) { return cat !== c; });
-            updateSettingsDb(systemSettings, updated);
-            triggerToast("類別已成功移除。", "success");
-          }
+        var handleDeleteCatClick = function(c) {
+          deleteConfirmState[1](c);
         };
 
-        return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in" },
+        var executeDeleteCat = function(c) {
+          var updated = categories.filter(function(cat) { return cat !== c; });
+          updateSettingsDb(systemSettings, updated);
+          triggerToast("競賽組別已成功移除。", "success");
+        };
+
+        return h('div', { className: "grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-fade-in relative" },
+          // 自訂類別刪除彈出框
+          deleteConfirmState[0] && h('div', { className: "fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 animate-fade-in" },
+            h('div', { className: "bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100" },
+              h('div', { className: "text-center mb-5" },
+                h('div', { className: "mx-auto h-12 w-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center text-xl mb-3" },
+                  h('i', { className: "fa-solid fa-tags" })
+                ),
+                h('h3', { className: "text-base font-bold text-slate-800" }, "確定刪除競賽類別？"),
+                h('p', { className: "text-xs text-slate-500 mt-2 leading-relaxed" }, "您確定要刪除「" + deleteConfirmState[0] + "」競賽類別嗎？")
+              ),
+              h('div', { className: "flex gap-3" },
+                h('button', {
+                  onClick: function() { deleteConfirmState[1](null); },
+                  className: "flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+                }, "取消"),
+                h('button', {
+                  onClick: function() {
+                    var catName = deleteConfirmState[0];
+                    deleteConfirmState[1](null);
+                    executeDeleteCat(catName);
+                  },
+                  className: "flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-rose-500/10"
+                }, "確定刪除")
+              )
+            )
+          ),
+
           h('div', { className: "lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100" },
             h('h3', { className: "text-base font-bold text-slate-800 mb-4 flex items-center gap-1.5" },
               h('i', { className: "fa-solid fa-tags text-blue-500" }), "當前開放競賽組別清單"
@@ -817,7 +887,7 @@
                 return h('div', { key: c, className: "flex justify-between items-center p-3.5 bg-slate-50 border border-slate-150 rounded-xl" },
                   h('span', { className: "font-bold text-slate-700 text-sm" }, c),
                   h('button', {
-                    onClick: function() { handleDeleteCat(c); },
+                    onClick: function() { handleDeleteCatClick(c); },
                     className: "text-rose-500 hover:text-rose-700 text-xs font-bold"
                   }, h('i', { className: "fa-regular fa-trash-can text-base" }))
                 );
@@ -911,7 +981,7 @@
       }
 
       // ==========================================
-      // 獨立元件 7: 通用參賽列表 (Dashboard)
+      // 獨立元件 7: 通用參賽列表 (Dashboard) (💡 核心修復點：更換 confirm/alert 為 React 模態窗)
       // ==========================================
       function DashboardList(props) {
         var currentUser = props.currentUser;
@@ -927,29 +997,98 @@
         var formatBytes = props.formatBytes;
         var MOCK_STATUSES = props.MOCK_STATUSES;
 
+        // 💡 自訂安全互動狀態，完全擺脫 appendChild 及沙盒 confirm 崩潰 Bug
+        var deleteConfirmState = useState(null); // 暫存待刪除作品 id
+        var detailsState = useState(null);       // 暫存待查看作品物件
+
         var displayProjects = currentUser.role === 'STUDENT'
           ? projects.filter(function(p) { return p.studentId === currentUser.account; })
           : projects;
 
-        var handleDeleteProject = async function(id) {
-          if (confirm("您確認要撤回並刪除這項投稿作品嗎？此操作無法還原。")) {
-            if (firebaseReady && db && !String(id).startsWith('local-')) {
-              try {
-                var collectionPath = 'artifacts/' + appId + '/public/data/projects';
-                await db.collection(collectionPath).doc(id).delete();
-                triggerToast("作品撤回成功！", "success");
-              } catch (e) {
-                triggerToast("撤回失敗", "error");
-              }
-            } else {
-              var updated = projects.filter(function(p) { return p.id !== id; });
-              updateProjectsDb(updated);
-              triggerToast("作品已從本地端成功移除。", "success");
+        // 觸發自訂撤回安全模態
+        var handleDeleteProjectClick = function(id) {
+          deleteConfirmState[1](id);
+        };
+
+        // 真正執行撤回 (由模態視窗的「確認」按鈕調用)
+        var executeDeleteProject = async function(id) {
+          if (firebaseReady && db && !String(id).startsWith('local-')) {
+            try {
+              var collectionPath = 'artifacts/' + appId + '/public/data/projects';
+              await db.collection(collectionPath).doc(id).delete();
+              triggerToast("作品撤回成功！", "success");
+            } catch (e) {
+              triggerToast("撤回失敗", "error");
             }
+          } else {
+            var updated = projects.filter(function(p) { return p.id !== id; });
+            updateProjectsDb(updated);
+            triggerToast("作品已從本地端成功移除。", "success");
           }
         };
 
-        return h('div', { className: "space-y-6 text-left animate-fade-in" },
+        return h('div', { className: "space-y-6 text-left animate-fade-in relative" },
+          
+          // 💡 撤回確認彈窗 (Custom Tailwind Confirm Modal)
+          deleteConfirmState[0] && h('div', { className: "fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 animate-fade-in" },
+            h('div', { className: "bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-100" },
+              h('div', { className: "text-center mb-5" },
+                h('div', { className: "mx-auto h-12 w-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center text-xl mb-3" },
+                  h('i', { className: "fa-solid fa-trash-can" })
+                ),
+                h('h3', { className: "text-base font-bold text-slate-800" }, "確認撤回參賽作品？"),
+                h('p', { className: "text-xs text-slate-500 mt-2 leading-relaxed" }, "您確定要撤回並刪除這項投稿作品嗎？此操作將會安全抹除雲端與本機數據，且將無法重新還原。")
+              ),
+              h('div', { className: "flex gap-3" },
+                h('button', {
+                  onClick: function() { deleteConfirmState[1](null); },
+                  className: "flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+                }, "取消"),
+                h('button', {
+                  onClick: function() {
+                    var targetId = deleteConfirmState[0];
+                    deleteConfirmState[1](null);
+                    executeDeleteProject(targetId);
+                  },
+                  className: "flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-rose-500/10"
+                }, "確認撤回")
+              )
+            )
+          ),
+
+          // 💡 作品詳情自訂彈窗 (Custom Detail Modal)
+          detailsState[0] && h('div', { className: "fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 animate-fade-in" },
+            h('div', { className: "bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 text-left" },
+              h('div', { className: "flex justify-between items-center border-b border-slate-100 pb-3 mb-4" },
+                h('h3', { className: "text-base font-bold text-slate-800 flex items-center gap-1.5" },
+                  h('i', { className: "fa-solid fa-circle-info text-blue-500" }), "參賽項目詳細資料"
+                ),
+                h('button', {
+                  onClick: function() { detailsState[1](null); },
+                  className: "text-slate-400 hover:text-slate-600 text-lg"
+                }, h('i', { className: "fa-solid fa-xmark" }))
+              ),
+              h('div', { className: "space-y-3.5 text-xs sm:text-sm text-slate-600" },
+                h('p', null, h('strong', { className: "text-slate-800 block mb-0.5" }, "作品名稱："), detailsState[0].title),
+                h('p', null, h('strong', { className: "text-slate-800 block mb-0.5" }, "競賽組別："), detailsState[0].category),
+                h('p', null, h('strong', { className: "text-slate-800 block mb-0.5" }, "指導老師："), detailsState[0].advisor || '無'),
+                h('p', null, h('strong', { className: "text-slate-800 block mb-0.5" }, "目前狀態："), 
+                  h('span', { className: "px-2 py-0.5 rounded font-bold text-[10px] inline-block " + (MOCK_STATUSES[detailsState[0].status]?.color || "bg-slate-100 text-slate-750") }, MOCK_STATUSES[detailsState[0].status]?.label)
+                ),
+                h('p', null, h('strong', { className: "text-slate-800 block mb-0.5" }, "上傳歷史日期時間："), detailsState[0].uploadTime || '未知'),
+                h('p', null, h('strong', { className: "text-slate-800 block mb-0.5" }, "作品概述摘要："), detailsState[0].summary || '無'),
+                h('div', { className: "bg-slate-50 p-3.5 rounded-xl border border-slate-100 mt-2" },
+                  h('strong', { className: "text-indigo-800 block mb-1 text-xs" }, "評審委員會綜合評語意見："),
+                  h('p', { className: "text-slate-600 text-xs leading-relaxed" }, detailsState[0].teacherFeedback || '目前尚無評審評語或具體修改意見。')
+                )
+              ),
+              h('button', {
+                onClick: function() { detailsState[1](null); },
+                className: "w-full mt-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition active:scale-95"
+              }, "確認並關閉視窗")
+            )
+          ),
+
           currentUser.role !== 'STUDENT' && h('div', { className: "grid grid-cols-2 lg:grid-cols-4 gap-4" },
             h('div', { className: "bg-white p-4.5 rounded-2xl border border-slate-100 shadow-sm flex items-center space-x-3.5" },
               h('div', { className: "p-2.5 bg-blue-50 text-blue-600 rounded-xl text-lg" }, h('i', { className: "fa-solid fa-file-invoice w-5 text-center" })),
@@ -1045,15 +1184,12 @@
                           h('i', { className: "fa-solid fa-magnifying-glass mr-1" }), "審查評估"
                         ) : h('div', { className: "space-x-2" },
                           h('button', {
-                            onClick: function() { 
-                              var feedbackMsg = project.teacherFeedback ? "\n評審建議意見：\n" + project.teacherFeedback : "\n評審尚未填寫修改意見。";
-                              alert("【作品項目名稱】\n" + project.title + "\n\n組別：" + project.category + "\n狀態：" + MOCK_STATUSES[project.status]?.label + "\n指導老師：" + project.advisor + "\n" + feedbackMsg); 
-                            },
-                            className: "text-slate-500 hover:text-slate-800 font-bold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 transition"
+                            onClick: function() { detailsState[1](project); }, // 💡 安全修復：呼叫自訂 React 詳情彈出框代替原生 alert()
+                            className: "text-slate-500 hover:text-slate-800 font-bold px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 transition"
                           }, "詳情"),
                           currentUser.role === 'STUDENT' && h('button', {
-                            onClick: function() { handleDeleteProject(project.id); },
-                            className: "text-rose-500 hover:text-rose-700 font-bold px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 transition"
+                            onClick: function() { handleDeleteProjectClick(project.id); }, // 💡 安全修復：呼叫自訂 React 確認彈出框
+                            className: "text-rose-500 hover:text-rose-700 font-bold px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 transition"
                           }, "撤回")
                         )
                       )
