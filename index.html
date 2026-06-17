@@ -23,13 +23,13 @@
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
 
-  <!-- 全域 JavaScript 錯誤捕獲診斷器：防止任何白底畫面，出錯時直接顯示診斷報告 -->
+  <!-- 全域 JavaScript 錯誤捕獲診斷器：防止任何白底畫面 -->
   <script>
     window.addEventListener('error', function(e) {
       var root = document.getElementById('root');
       if (root) {
         root.innerHTML = `
-          <div style="padding: 24px; background: #fff1f2; color: #9f1239; font-family: system-ui, sans-serif; border-radius: 12px; margin: 40px auto; max-width: 600px; border: 1px solid #fecdd3; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+          <div style="padding: 24px; background: #fff1f2; color: #9f1239; font-family: system-ui, sans-serif; border-radius: 12px; margin: 40px auto; max-width: 600px; border: 1px solid #fecdd3; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: left;">
             <h3 style="margin-top: 0; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
               <i class="fa-solid fa-triangle-exclamation" style="color: #e11d48;"></i> 網頁腳本載入或執行失敗
             </h3>
@@ -56,7 +56,7 @@
     const { useState, useEffect } = React;
 
     // ==========================================
-    // ⚠️ 請在這裡替換成您自己的 Firebase Config ⚠️
+    // ⚠️ 您的 Firebase Config 設定 ⚠️
     // ==========================================
     const myFirebaseConfig = {
       apiKey: "AIzaSyDCx4EegIg4bvxVbGTgTBUrCczcHibTbSw",
@@ -82,7 +82,7 @@
         firebaseReady = true;
       }
     } catch (e) {
-      console.warn("Firebase 基礎初始化失敗，將切換至安全本機展示模式：", e);
+      console.warn("Firebase 初始化失敗：", e);
     }
 
     const appId = typeof __app_id !== 'undefined' ? __app_id : (myFirebaseConfig.projectId || 'hsescompetitive');
